@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saisie du Jour — Espace de Travail</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#1A1A1A;--surface:#252525;--dark:#111111;--mid:#333333;
+    --muted:#888888;--border:#3A3A3A;
+    --t-h:#A8C4E0;--dt-h:#1A3A5C;--t-f:#E8B4C8;--dt-f:#5C1A35;
+    --t-ag:#A8D8D8;--dt-ag:#1A4A4A;--t-af:#C8B4E0;--dt-af:#3A1A5C;
+    --t-eg:#A8D8B0;--dt-eg:#1A4A25;--t-ef:#F0C8A0;--dt-ef:#5C3010;
+    --a-fo:#A8D8D8;--da-fo:#1A4A4A;--a-co:#F0AAAA;--da-co:#5C1A1A;
+    --a-re:#A8C4E0;--da-re:#1A3A5C;--a-bu:#A8D8B0;--da-bu:#1A4A25;
+    --a-sm:#F0C8A0;--da-sm:#5C3010;--a-je:#C8B4E0;--da-je:#3A1A5C;
+    --a-at:#F0D8A0;--da-at:#5C4010;
+    --yes-bg:#1A2E20;--yes-fg:#A8D8B0;--no-bg:#2E1A1A;--no-fg:#F0AAAA;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);min-height:100vh;color:var(--dark);}
+  .header{background:var(--dark);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .header-left h1{font-size:17px;font-weight:500;color:#EDE8E3;}
+  .header-left p{font-size:12px;color:var(--muted);margin-top:2px;font-family:'DM Mono',monospace;}
+  .counter{background:var(--mid);border-radius:24px;padding:8px 16px;text-align:center;}
+  .counter-num{font-size:22px;font-weight:600;color:#E8D8A8;font-family:'DM Mono',monospace;line-height:1;}
+  .counter-lbl{font-size:10px;color:var(--muted);letter-spacing:0.5px;margin-top:2px;}
+  .main{max-width:560px;margin:0 auto;padding:28px 16px 80px;}
+  .card{background:var(--surface);border-radius:16px;border:1px solid var(--border);overflow:hidden;margin-bottom:12px;}
+  .card-section{padding:18px 20px;border-bottom:1px solid var(--border);}
+  .card-section:last-child{border-bottom:none;}
+  .field-label{font-size:10px;font-weight:600;letter-spacing:0.8px;color:var(--muted);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+  .field-label .dot{width:6px;height:6px;border-radius:50%;background:var(--border);display:inline-block;}
+  .field-label .dot.filled{background:var(--mid);}
+  .styled-select{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:#EDE8E3;font-family:'DM Sans',sans-serif;font-size:14px;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238C7B70' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;cursor:pointer;}
+  .styled-select:focus{outline:none;border-color:#555;} .styled-select option{background:#252525;color:#EDE8E3;}
+  .pill-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .pill{padding:7px 14px;border-radius:24px;font-size:13px;cursor:pointer;border:1.5px solid transparent;transition:all 0.12s;user-select:none;display:flex;align-items:center;gap:5px;}
+  .pill:hover{transform:translateY(-1px);}
+  .pill.selected{font-weight:600;transform:translateY(-1px);border-width:2px;}
+  .pill-h{background:#1E2A38;color:#A8C4E0;border-color:#A8C4E0;}
+  .pill-f{background:#2E1E28;color:#E8B4C8;border-color:#E8B4C8;}
+  .pill-ag{background:#1A2E2E;color:#A8D8D8;border-color:#A8D8D8;}
+  .pill-af{background:#261E38;color:#C8B4E0;border-color:#C8B4E0;}
+  .pill-eg{background:#1A2E20;color:#A8D8B0;border-color:#A8D8B0;}
+  .pill-ef{background:#2E2418;color:#F0C8A0;border-color:#F0C8A0;}
+  .pill-fo{background:#1A2E2E;color:#A8D8D8;border-color:#A8D8D8;}
+  .pill-co{background:#2E1A1A;color:#F0AAAA;border-color:#F0AAAA;}
+  .pill-re{background:#1E2A38;color:#A8C4E0;border-color:#A8C4E0;}
+  .pill-bu{background:#1A2E20;color:#A8D8B0;border-color:#A8D8B0;}
+  .pill-sm{background:#2E2418;color:#F0C8A0;border-color:#F0C8A0;}
+  .pill-je{background:#261E38;color:#C8B4E0;border-color:#C8B4E0;}
+  .pill-at{background:#2E2A18;color:#F0D8A0;border-color:#F0D8A0;}
+  .pill-abo{background:#1A2E20;color:#A8D8B0;border-color:#A8D8B0;}
+  .pill-nab{background:#2E1A1A;color:#F0AAAA;border-color:#F0AAAA;}
+  .pill-yes{background:#1A2E20;color:#A8D8B0;border-color:#A8D8B0;}
+  .pill-no{background:#2E1A1A;color:#F0AAAA;border-color:#F0AAAA;}
+  .atelier-section{display:none;}
+  .atelier-section.visible{display:block;}
+  .impr-row{display:flex;align-items:flex-start;gap:20px;}
+  .impr-row .pill-group{flex:1;}
+  .nb-wrap{display:none;flex-direction:column;gap:6px;}
+  .nb-wrap.visible{display:flex;}
+  .nb-wrap label{font-size:10px;font-weight:600;letter-spacing:0.8px;color:var(--muted);text-transform:uppercase;}
+  .nb-input{width:72px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:#EDE8E3;font-family:'DM Mono',monospace;font-size:15px;text-align:center;}
+  .text-input{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:#EDE8E3;font-family:'DM Sans',sans-serif;font-size:14px;resize:none;}
+  .text-input::placeholder{color:var(--muted);}
+  .btn-submit{width:100%;padding:14px;background:var(--dark);color:#EDE8E3;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;transition:background 0.15s;}
+  .btn-submit:hover{background:var(--mid);}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--dark);color:#EDE8E3;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:500;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:999;white-space:nowrap;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .toast.success{background:#1A3A22;}
+  .toast.error{background:#3A1212;}
+  .correction-banner{display:none;background:#2A2418;border:1px solid #5C4A10;border-radius:12px;padding:14px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px;}
+  .correction-banner.visible{display:flex;}
+  .correction-banner p{font-size:13px;color:#F0D8A0;font-weight:500;}
+  .correction-banner small{font-size:11px;color:#8C7B70;display:block;margin-top:2px;}
+  .btn-correct{padding:8px 14px;background:#3A3010;color:#F0D8A0;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+  .timer-bar{height:3px;background:var(--border);border-radius:2px;margin-top:10px;overflow:hidden;}
+  .timer-fill{height:100%;background:#5C4A20;border-radius:2px;width:100%;}
+  .err-msg{font-size:11px;color:var(--no-fg);margin-top:6px;display:none;}
+  .err-msg.visible{display:block;}
+  #hidden-frame{display:none;width:0;height:0;border:none;}
+
+  /* ── Onglets ── */
+  .tabs{display:flex;gap:0;margin-bottom:20px;background:#1E1E1E;border-radius:12px;border:1px solid #3A3A3A;overflow:hidden;}
+  .tab-btn{flex:1;padding:13px 8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#888;background:transparent;border:none;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .tab-btn.active{background:#333;color:#EDE8E3;}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+  /* ── Tableau visites ── */
+  .visits-card{background:#252525;border-radius:16px;border:1px solid #3A3A3A;overflow:hidden;}
+  .visits-header{padding:16px 20px;border-bottom:1px solid #3A3A3A;display:flex;align-items:center;justify-content:space-between;}
+  .visits-header h2{font-size:14px;font-weight:600;color:#EDE8E3;}
+  .visits-empty{padding:40px 20px;text-align:center;color:#888;font-size:14px;}
+  .tbl{width:100%;border-collapse:collapse;font-size:12px;}
+  .tbl th{padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:0.6px;color:#888;text-transform:uppercase;background:#1E1E1E;border-bottom:1px solid #3A3A3A;}
+  .tbl td{padding:10px 12px;border-bottom:1px solid #2E2E2E;color:#CCC;vertical-align:middle;}
+  .tbl tr:last-child td{border-bottom:none;}
+  .tbl tr:nth-child(even) td{background:#1E1E1E;}
+  .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500;}
+  .badge-abo{background:#1A2E20;color:#A8D8B0;}
+  .badge-nab{background:#2E1A1A;color:#F0AAAA;}
+  .badge-yes{background:#1A2E2E;color:#A8D8D8;}
+  .badge-no{background:#2A2A2A;color:#888;}
+  .btn-refresh{padding:6px 12px;background:#2A2A2A;border:1px solid #3A3A3A;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;color:#888;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <h1>Saisie du Jour</h1>
+    <p id="date-display"></p>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="rapport.html" style="padding:7px 14px;background:#1A2E2E;color:#A8D8D8;border:1px solid #A8D8D8;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-decoration:none;display:flex;align-items:center;gap:5px">📊 Rapport</a>
+    <div class="counter">
+      <div class="counter-num" id="visit-count">0</div>
+      <div class="counter-lbl">visites aujourd'hui</div>
+    </div>
+    <div class="counter-impr">
+      <div class="counter-impr-num" id="impr-count">0</div>
+      <div class="counter-impr-lbl">🖨️ impressions</div>
+    </div>
+  </div>
+</header>
+
+<main class="main">
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('saisie')" id="tab-saisie">✏️ Saisie</button>
+    <button class="tab-btn" onclick="showTab('visites')" id="tab-visites">📋 Visites du jour</button>
+  </div>
+
+  <div class="tab-content active" id="content-saisie">
+
+  <div class="correction-banner" id="correction-banner">
+    <div>
+      <p>✏️ Corriger la dernière saisie ?</p>
+      <small>Disponible encore <span id="timer-seconds">5:00</span></small>
+      <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+    </div>
+    <button class="btn-correct" onclick="loadLastEntry()">Corriger</button>
+  </div>
+
+  <div class="card">
+
+    <div class="card-section">
+      <div class="field-label"><span class="dot" id="dot-heure"></span>Tranche horaire</div>
+      <select class="styled-select" id="sel-heure">
+        <option value="">— Sélectionner —</option>
+        <optgroup label="Matin">
+          <option>9h</option><option>10h</option><option>11h</option><option>12h</option>
+        </optgroup>
+        <optgroup label="Après-midi (standard)">
+          <option>14h</option><option>15h</option><option>16h</option><option>17h</option>
+        </optgroup>
+        <optgroup label="Après-midi (Jeudi & Vendredi)">
+          <option>14h30</option><option>15h30</option><option>16h30</option>
+        </optgroup>
+      </select>
+      <p class="err-msg" id="err-heure">Veuillez sélectionner une tranche horaire.</p>
+    </div>
+
+    <div class="card-section">
+      <div class="field-label"><span class="dot" id="dot-type"></span>Type de personne</div>
+      <div class="pill-grid" id="pills-type">
+        <span class="pill pill-h"  data-val="Homme">👨 Homme</span>
+        <span class="pill pill-f"  data-val="Femme">👩 Femme</span>
+        <span class="pill pill-ag" data-val="Adolescent Garçon">🧑 Ado Garçon</span>
+        <span class="pill pill-af" data-val="Adolescente Fille">👧 Ado Fille</span>
+        <span class="pill pill-eg" data-val="Enfant Garçon">👦 Enf. Garçon</span>
+        <span class="pill pill-ef" data-val="Enfant Fille">🧒 Enf. Fille</span>
+      </div>
+      <p class="err-msg" id="err-type">Veuillez sélectionner un type de personne.</p>
+    </div>
+
+    <div class="card-section">
+      <div class="field-label"><span class="dot" id="dot-statut"></span>Statut</div>
+      <div class="pill-grid" id="pills-statut">
+        <span class="pill pill-abo" data-val="Abonné">✓ Abonné</span>
+        <span class="pill pill-nab" data-val="Non Abonné">Non abonné</span>
+      </div>
+      <p class="err-msg" id="err-statut">Veuillez sélectionner un statut.</p>
+    </div>
+
+    <div class="card-section">
+      <div class="field-label"><span class="dot" id="dot-activite"></span>Activité choisie</div>
+      <div class="pill-grid" id="pills-activite">
+        <span class="pill pill-fo" data-val="Formation">📚 Formation</span>
+        <span class="pill pill-co" data-val="Consultation">🩺 Consultation</span>
+        <span class="pill pill-re" data-val="Recherche">🔍 Recherche</span>
+        <span class="pill pill-bu" data-val="Aide Bureautique">💻 Aide Bureautique</span>
+        <span class="pill pill-sm" data-val="Aide Smartphone">📱 Aide Smartphone</span>
+        <span class="pill pill-je" data-val="Jeux Vidéos">🎮 Jeux Vidéos</span>
+        <span class="pill pill-at" data-val="Ateliers">🛠️ Ateliers</span>
+      </div>
+      <p class="err-msg" id="err-activite">Veuillez sélectionner une activité.</p>
+    </div>
+
+    <div class="card-section atelier-section" id="atelier-section">
+      <div class="field-label"><span class="dot filled"></span>Type d'atelier</div>
+      <select class="styled-select" id="sel-atelier">
+        <option value="">— Sélectionner —</option>
+        <option>Impression 3D</option><option>Découpe Laser</option>
+        <option>Découpe Vinyle</option><option>Programmation</option>
+        <option>Robotique</option><option>Modélisation 3D</option>
+        <option>Casque VR</option><option>Cours Magistraux</option>
+        <option>Cours de Photos</option><option>Cours Montage Vidéos</option>
+        <option>Spécial</option>
+      </select>
+    </div>
+
+    <div class="card-section">
+      <div class="field-label"><span class="dot" id="dot-impr"></span>Impression</div>
+      <div class="impr-row">
+        <div class="pill-group">
+          <div class="pill-grid" id="pills-impr">
+            <span class="pill pill-yes" data-val="Oui">🖨️ Oui</span>
+            <span class="pill pill-no"  data-val="Non">Non</span>
+          </div>
+        </div>
+        <div class="nb-wrap" id="nb-wrap">
+          <label>Nombre</label>
+          <input class="nb-input" type="number" id="nb-impr" min="1" placeholder="0">
+        </div>
+      </div>
+      <p class="err-msg" id="err-impr">Veuillez indiquer si une impression a été faite.</p>
+    </div>
+
+    <div class="card-section">
+      <div class="field-label"><span class="dot"></span>Remarques <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(optionnel)</span></div>
+      <textarea class="text-input" id="txt-remarques" rows="2" placeholder="Note libre..."></textarea>
+    </div>
+
+    <div class="card-section">
+      <button class="btn-submit" onclick="submitForm()">
+        <span>Enregistrer la visite</span>
+        <span style="font-size:16px">→</span>
+      </button>
+    </div>
+
+  </div>
+  </div><!-- fin content-saisie -->
+
+  <div class="tab-content" id="content-visites">
+    <div class="visits-card">
+      <div class="visits-header">
+        <h2>📋 Visites enregistrées aujourd'hui</h2>
+        <button class="btn-refresh" onclick="renderTable()">↻ Actualiser</button>
+      </div>
+      <div id="visits-body">
+        <div class="visits-empty">
+          <div style="font-size:32px">📭</div>
+          <p style="margin-top:8px;font-size:12px">Aucune visite enregistrée pour l'instant</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- iFrame caché pour l'envoi des données (compatible Google Sites) -->
+<iframe id="hidden-frame" name="hidden-frame"></iframe>
+<form id="hidden-form" method="GET" target="hidden-frame" style="display:none">
+  <input type="hidden" name="heure"     id="f-heure">
+  <input type="hidden" name="type"      id="f-type">
+  <input type="hidden" name="statut"    id="f-statut">
+  <input type="hidden" name="activite"  id="f-activite">
+  <input type="hidden" name="atelier"   id="f-atelier">
+  <input type="hidden" name="impr"      id="f-impr">
+  <input type="hidden" name="nb_impr"   id="f-nb_impr">
+  <input type="hidden" name="remarques" id="f-remarques">
+</form>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ REMPLACE ICI PAR L'URL DE TON DÉPLOIEMENT APPS SCRIPT ══
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2k5FNBbmLXp84-3WrXrPg5xyXTupmrn7QJ--8NyPR4UMzw978VDSqK9LN8iNa8odnPA/exec';
+// ════════════════════════════════════════════════════════════
+
+const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const now=new Date();
+document.getElementById('date-display').textContent=`${JOURS[now.getDay()]} ${now.getDate()} ${MOIS[now.getMonth()]} ${now.getFullYear()}`;
+
+function today(){return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;}
+
+let visitCount=parseInt(localStorage.getItem('visitCount_'+today())||'0');
+let lastEntry=JSON.parse(localStorage.getItem('lastEntry')||'null');
+let lastTime=parseInt(localStorage.getItem('lastTime')||'0');
+let timerInterval,correctionTimeout;
+const CORRECTION_MS=5*60*1000;
+
+document.getElementById('visit-count').textContent=visitCount;
+
+document.querySelectorAll('.pill-grid').forEach(grid=>{
+  grid.addEventListener('click',e=>{
+    const pill=e.target.closest('.pill');
+    if(!pill)return;
+    grid.querySelectorAll('.pill').forEach(p=>p.classList.remove('selected'));
+    pill.classList.add('selected');
+    if(grid.id==='pills-activite'){
+      const isAtelier=pill.dataset.val==='Ateliers';
+      document.getElementById('atelier-section').classList.toggle('visible',isAtelier);
+      if(!isAtelier)document.getElementById('sel-atelier').value='';
+    }
+    if(grid.id==='pills-impr'){
+      document.getElementById('nb-wrap').classList.toggle('visible',pill.dataset.val==='Oui');
+      if(pill.dataset.val==='Non')document.getElementById('nb-impr').value='';
+    }
+    updateDots();
+  });
+});
+
+document.getElementById('sel-heure').addEventListener('change',updateDots);
+
+function updateDots(){
+  const fields={'dot-heure':document.getElementById('sel-heure').value,'dot-type':getSelected('pills-type'),'dot-statut':getSelected('pills-statut'),'dot-activite':getSelected('pills-activite'),'dot-impr':getSelected('pills-impr')};
+  Object.entries(fields).forEach(([id,val])=>document.getElementById(id)?.classList.toggle('filled',!!val));
+}
+
+function getSelected(gridId){
+  return document.querySelector(`#${gridId} .pill.selected`)?.dataset.val||'';
+}
+
+function validate(){
+  let ok=true;
+  [['sel-heure','err-heure',document.getElementById('sel-heure').value],
+   ['pills-type','err-type',getSelected('pills-type')],
+   ['pills-statut','err-statut',getSelected('pills-statut')],
+   ['pills-activite','err-activite',getSelected('pills-activite')],
+   ['pills-impr','err-impr',getSelected('pills-impr')]
+  ].forEach(([,errId,val])=>{
+    const el=document.getElementById(errId);
+    if(!val){el.classList.add('visible');ok=false;}
+    else el.classList.remove('visible');
+  });
+  return ok;
+}
+
+function submitForm(){
+  if(!validate()){showToast('⚠️ Remplis tous les champs requis','error');return;}
+  const entry={
+    heure:document.getElementById('sel-heure').value,
+    type:getSelected('pills-type'),
+    statut:getSelected('pills-statut'),
+    activite:getSelected('pills-activite'),
+    atelier:document.getElementById('sel-atelier').value,
+    impr:getSelected('pills-impr'),
+    nb_impr:document.getElementById('nb-impr').value||'',
+    remarques:document.getElementById('txt-remarques').value,
+  };
+
+  // Envoi via Image (compatible tous appareils + mobile)
+  var params = 'heure='     + encodeURIComponent(entry.heure) +
+               '&type='     + encodeURIComponent(entry.type) +
+               '&statut='   + encodeURIComponent(entry.statut) +
+               '&activite=' + encodeURIComponent(entry.activite) +
+               '&atelier='  + encodeURIComponent(entry.atelier) +
+               '&impr='     + encodeURIComponent(entry.impr) +
+               '&nb_impr='  + encodeURIComponent(entry.nb_impr) +
+               '&remarques='+ encodeURIComponent(entry.remarques);
+  var img = new Image();
+  img.src = SCRIPT_URL + '?' + params;
+
+  visitCount++;
+  localStorage.setItem('visitCount_'+today(),visitCount);
+  document.getElementById('visit-count').textContent=visitCount;
+  localStorage.setItem('lastEntry',JSON.stringify(entry));
+  localStorage.setItem('lastTime',Date.now().toString());
+  lastEntry=entry; lastTime=Date.now();
+
+  showToast('✓ Visite enregistrée !','success');
+  resetForm();
+  showCorrectionBanner();
+}
+
+function resetForm(){
+  document.getElementById('sel-heure').value='';
+  document.querySelectorAll('.pill.selected').forEach(p=>p.classList.remove('selected'));
+  document.getElementById('atelier-section').classList.remove('visible');
+  document.getElementById('sel-atelier').value='';
+  document.getElementById('nb-wrap').classList.remove('visible');
+  document.getElementById('nb-impr').value='';
+  document.getElementById('txt-remarques').value='';
+  document.querySelectorAll('.err-msg').forEach(e=>e.classList.remove('visible'));
+  updateDots();
+}
+
+function loadLastEntry(){
+  if(!lastEntry)return;
+  document.getElementById('correction-banner').classList.remove('visible');
+  document.getElementById('sel-heure').value=lastEntry.heure;
+  ['pills-type','pills-statut','pills-activite','pills-impr'].forEach(gridId=>{
+    const key={'pills-type':'type','pills-statut':'statut','pills-activite':'activite','pills-impr':'impr'}[gridId];
+    document.querySelectorAll(`#${gridId} .pill`).forEach(p=>p.classList.toggle('selected',p.dataset.val===lastEntry[key]));
+  });
+  if(lastEntry.activite==='Ateliers'){document.getElementById('atelier-section').classList.add('visible');document.getElementById('sel-atelier').value=lastEntry.atelier;}
+  if(lastEntry.impr==='Oui'){document.getElementById('nb-wrap').classList.add('visible');document.getElementById('nb-impr').value=lastEntry.nb_impr;}
+  document.getElementById('txt-remarques').value=lastEntry.remarques;
+  visitCount=Math.max(0,visitCount-1);
+  localStorage.setItem('visitCount_'+today(),visitCount);
+  document.getElementById('visit-count').textContent=visitCount;
+  updateDots();
+  clearInterval(timerInterval);
+  showToast('✏️ Saisie chargée — modifie et réenregistre','success');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function showCorrectionBanner(){
+  const banner=document.getElementById('correction-banner');
+  banner.classList.add('visible');
+  clearInterval(timerInterval);clearTimeout(correctionTimeout);
+  const startTime=Date.now();
+  timerInterval=setInterval(()=>{
+    const rem=Math.max(0,CORRECTION_MS-(Date.now()-startTime));
+    const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);
+    document.getElementById('timer-seconds').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+    document.getElementById('timer-fill').style.width=(rem/CORRECTION_MS*100)+'%';
+    if(rem<=0){clearInterval(timerInterval);banner.classList.remove('visible');}
+  },1000);
+  correctionTimeout=setTimeout(()=>{banner.classList.remove('visible');clearInterval(timerInterval);},CORRECTION_MS);
+}
+
+if(lastEntry&&lastTime&&(Date.now()-lastTime)<CORRECTION_MS){
+  const startTime=Date.now()-(Date.now()-lastTime);
+  document.getElementById('correction-banner').classList.add('visible');
+  timerInterval=setInterval(()=>{
+    const rem=Math.max(0,CORRECTION_MS-(Date.now()-startTime));
+    const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);
+    document.getElementById('timer-seconds').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+    document.getElementById('timer-fill').style.width=(rem/CORRECTION_MS*100)+'%';
+    if(rem<=0){clearInterval(timerInterval);document.getElementById('correction-banner').classList.remove('visible');}
+  },1000);
+}
+
+
+// ── Onglets ───────────────────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('content-'+tab).classList.add('active');
+  if(tab==='visites') renderTable();
+}
+
+// ── Tableau des visites du jour (depuis Google Sheets) ───────────────────
+let todayEntries=[];
+
+let currentRows = [];
+
+function renderTable(){
+  const body=document.getElementById('visits-body');
+  body.innerHTML='<div class="visits-empty"><div style="font-size:24px">⏳</div><p style="margin-top:8px;font-size:12px">Chargement...</p></div>';
+
+  const url = SCRIPT_URL + '?action=getToday';
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if(!data.rows || data.rows.length === 0){
+        body.innerHTML='<div class="visits-empty"><div style="font-size:32px">📭</div><p style="margin-top:8px;font-size:12px">Aucune visite enregistrée pour l\'instant</p></div>';
+        document.getElementById('visit-count').textContent=0;
+        document.getElementById('impr-count').textContent=0;
+        return;
+      }
+      currentRows = data.rows;
+      buildTable(currentRows);
+    })
+    .catch(()=>{
+      body.innerHTML='<div class="visits-empty"><div style="font-size:32px">⚠️</div><p style="margin-top:8px;font-size:12px">Impossible de charger les données</p></div>';
+    });
+}
+
+function buildTable(rows){
+  const body=document.getElementById('visits-body');
+  const ICONS={'Formation':'📚','Consultation':'🩺','Recherche':'🔍','Aide Bureautique':'💻','Aide Smartphone':'📱','Jeux Vidéos':'🎮','Ateliers':'🛠️'};
+  let html='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Heure</th><th>Profil</th><th>Statut</th><th>Activité</th><th>Impr.</th><th></th></tr></thead><tbody>';
+  let totalImpr=0;
+  rows.forEach((e,i)=>{
+    const icon=ICONS[e.activite]||'';
+    const statBadge=e.statut==='Abonné'?'<span class="badge badge-abo">✓ Abonné</span>':'<span class="badge badge-nab">Non ab.</span>';
+    const imprBadge=e.impr==='Oui'?`<span class="badge badge-yes">🖨️ ${e.nb_impr||1}</span>`:'<span class="badge badge-no">Non</span>';
+    if(e.impr==='Oui') totalImpr+=parseInt(e.nb_impr)||1;
+    html+=`<tr>
+      <td style="color:#666;font-family:'DM Mono',monospace">${i+1}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:500;color:#EDE8E3">${e.heure}</td>
+      <td style="color:#CCC">${e.type}</td>
+      <td>${statBadge}</td>
+      <td style="color:#CCC">${icon} ${e.activite}${e.atelier?'<br><span style="font-size:10px;color:#666">'+e.atelier+'</span>':''}</td>
+      <td>${imprBadge}</td>
+      <td><button class="btn-delete" onclick="deleteRow(${i})">✕</button></td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  body.innerHTML=html;
+  document.getElementById('visit-count').textContent=rows.length;
+  document.getElementById('impr-count').textContent=totalImpr;
+}
+
+function deleteRow(index){
+  if(!confirm('Supprimer cette visite ?')) return;
+  currentRows.splice(index,1);
+  buildTable(currentRows);
+  showToast('🗑️ Visite supprimée','error');
+}
+
+let toastTimer;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>
