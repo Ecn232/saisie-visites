@@ -349,6 +349,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ⚠️ METS TON LIEN DE DEPLOIEMENT GOOGLE APPS SCRIPT ICI !
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2k5FNBbmLXp84-3WrXrPg5xyXTupmrn7QJ--8NyPR4UMzw978VDSqK9LN8iNa8odnPA/exec';
 
 const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
@@ -356,11 +357,10 @@ const MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','
 const now=new Date();
 document.getElementById('date-display').textContent=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
 
-// MODIFICATION DU MOIS (+1) pour éviter que Janvier soit 0
 function today(){return now.getFullYear()+'-'+(now.getMonth()+1)+'-'+now.getDate();}
 
 let visitCount=parseInt(localStorage.getItem('visitCount_'+today())||'0');
-let imprCount=parseInt(localStorage.getItem('imprCount_'+today())||'0'); // Ajout du compteur d'impressions
+let imprCount=parseInt(localStorage.getItem('imprCount_'+today())||'0');
 let lastEntry=JSON.parse(localStorage.getItem('lastEntry')||'null');
 let lastTime=parseInt(localStorage.getItem('lastTime')||'0');
 let timerInterval,correctionTimeout;
@@ -411,6 +411,7 @@ function validate(){
   return ok;
 }
 
+// ✅ MODIFICATION DE SUBMITFORM POUR PARLER À GOOGLE SHEETS EN METHODE MODERNE FETCH
 function submitForm(){
   if(!validate()){showToast('⚠️ Remplis tous les champs requis','error');return;}
   
@@ -422,36 +423,48 @@ function submitForm(){
     atelier:document.getElementById('sel-atelier').value,
     impr:getSelected('pills-impr'),
     nb_impr:document.getElementById('nb-impr').value||'0',
-    remarques:document.getElementById('txt-remarques').value,
-    horodatage: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})
+    remarques:document.getElementById('txt-remarques').value
   };
 
-  var params='heure='+encodeURIComponent(entry.heure)+'&type='+encodeURIComponent(entry.type)+'&statut='+encodeURIComponent(entry.statut)+'&activite='+encodeURIComponent(entry.activite)+'&atelier='+encodeURIComponent(entry.atelier)+'&impr='+encodeURIComponent(entry.impr)+'&nb_impr='+encodeURIComponent(entry.nb_impr)+'&remarques='+encodeURIComponent(entry.remarques);
-  var img=new Image();img.src=SCRIPT_URL+'?'+params;
+  const url = SCRIPT_URL + '?' +
+    'heure=' + encodeURIComponent(entry.heure) +
+    '&type=' + encodeURIComponent(entry.type) +
+    '&statut=' + encodeURIComponent(entry.statut) +
+    '&activite=' + encodeURIComponent(entry.activite) +
+    '&atelier=' + encodeURIComponent(entry.atelier) +
+    '&impr=' + encodeURIComponent(entry.impr) +
+    '&nb_impr=' + encodeURIComponent(entry.nb_impr) +
+    '&remarques=' + encodeURIComponent(entry.remarques);
 
-  // Enregistrement des données de visite locales
-  visitCount++;
-  localStorage.setItem('visitCount_'+today(),visitCount);
-  document.getElementById('visit-count').textContent=visitCount;
+  fetch(url, { method: 'GET', mode: 'no-cors' })
+    .then(() => {
+      visitCount++;
+      localStorage.setItem('visitCount_'+today(), visitCount);
+      document.getElementById('visit-count').textContent = visitCount;
 
-  if (entry.impr === 'Oui') {
-    imprCount += parseInt(entry.nb_impr);
-    localStorage.setItem('imprCount_'+today(), imprCount);
-    document.getElementById('impr-count').textContent=imprCount;
-  }
+      if (entry.impr === 'Oui') {
+        imprCount += parseInt(entry.nb_impr);
+        localStorage.setItem('imprCount_'+today(), imprCount);
+        document.getElementById('impr-count').textContent = imprCount;
+      }
 
-  // Historique pour l'onglet "Visites du jour"
-  let history = JSON.parse(localStorage.getItem('history_'+today()) || '[]');
-  history.push(entry);
-  localStorage.setItem('history_'+today(), JSON.stringify(history));
+      localStorage.setItem('lastEntry', JSON.stringify(entry));
+      localStorage.setItem('lastTime', Date.now().toString());
+      lastEntry = entry; lastTime = Date.now();
 
-  localStorage.setItem('lastEntry',JSON.stringify(entry));
-  localStorage.setItem('lastTime',Date.now().toString());
-  lastEntry=entry;lastTime=Date.now();
-
-  showToast('✓ Visite enregistrée !','success');
-  resetForm();
-  showCorrectionBanner();
+      showToast('✓ Visite enregistrée dans Google Sheets !', 'success');
+      resetForm();
+      showCorrectionBanner();
+      
+      // On rafraîchit le tableau des visites du jour immédiatement
+      if(document.getElementById('tab-visites').classList.contains('active')) {
+        renderTable();
+      }
+    })
+    .catch(err => {
+      showToast('❌ Erreur de connexion au script', 'error');
+      console.error(err);
+    });
 }
 
 function resetForm(){
@@ -478,7 +491,6 @@ function loadLastEntry(){
   if(lastEntry.impr==='Oui'){document.getElementById('nb-wrap').classList.add('visible');document.getElementById('nb-impr').value=lastEntry.nb_impr;}
   document.getElementById('txt-remarques').value=lastEntry.remarques;
 
-  // Décrémentation car on est en correction
   visitCount=Math.max(0,visitCount-1);
   localStorage.setItem('visitCount_'+today(),visitCount);
   document.getElementById('visit-count').textContent=visitCount;
@@ -489,13 +501,8 @@ function loadLastEntry(){
     document.getElementById('impr-count').textContent=imprCount;
   }
 
-  // Retrait de la dernière visite de l'historique
-  let history = JSON.parse(localStorage.getItem('history_'+today()) || '[]');
-  history.pop();
-  localStorage.setItem('history_'+today(), JSON.stringify(history));
-
   updateDots();clearInterval(timerInterval);
-  showToast('✏️ Saisie chargée — modifie et réenregistre','success');
+  showToast('✏️ Saisie chargée — modifie et réenregistre', 'success');
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -526,8 +533,6 @@ if(lastEntry&&lastTime&&(Date.now()-lastTime)<CORRECTION_MS){
   },1000);
 }
 
-// ── REPARATIONS ET AJOUTS DE LA COUPE DE FIN ──
-
 function showTab(tabId) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -546,62 +551,67 @@ function showToast(msg, type) {
   setTimeout(() => { t.className = 'toast'; }, 3000);
 }
 
-// Génération du tableau dans "Visites du jour"
+// ✅ LIRE EN DIRECT LES VISITES DU JOUR DEPUIS GOOGLE SHEETS
 function renderTable() {
   const container = document.getElementById('visits-body');
-  const history = JSON.parse(localStorage.getItem('history_'+today()) || '[]');
+  container.innerHTML = '<div class="visits-empty"><p>🔄 Chargement depuis Google Sheets...</p></div>';
 
-  if (history.length === 0) {
-    container.innerHTML = `
-      <div class="visits-empty">
-        <div style="font-size:32px">📭</div>
-        <p style="margin-top:8px;font-size:12px">Aucune visite enregistrée pour l'instant</p>
-      </div>
-    `;
-    return;
-  }
+  const url = SCRIPT_URL + '?action=getToday';
 
-  let html = `
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Heure</th>
-          <th>Saisie</th>
-          <th>Type</th>
-          <th>Statut</th>
-          <th>Activité</th>
-          <th>Impr</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      if (data.status !== "ok" || !data.rows || data.rows.length === 0) {
+        container.innerHTML = `
+          <div class="visits-empty">
+            <div style="font-size:32px">📭</div>
+            <p style="margin-top:8px;font-size:12px">Aucune visite dans Google Sheets aujourd'hui</p>
+          </div>
+        `;
+        return;
+      }
 
-  // On lit à l'envers pour voir les plus récentes en haut
-  for (let i = history.length - 1; i >= 0; i--) {
-    const v = history[i];
-    const badgeType = v.statut === 'Abonné' ? 'badge-abo' : 'badge-nab';
-    const badgeImpr = v.impr === 'Oui' ? 'badge-yes' : 'badge-no';
-    
-    html += `
-      <tr>
-        <td style="font-family:'DM Mono'; font-weight:600;">${v.horodatage}</td>
-        <td>${v.heure}</td>
-        <td>${v.type}</td>
-        <td><span class="badge ${badgeType}">${v.statut}</span></td>
-        <td>${v.activite}${v.atelier ? ' ('+v.atelier+')' : ''}</td>
-        <td><span class="badge ${badgeImpr}">${v.impr === 'Oui' ? 'Oui ('+v.nb_impr+')' : 'Non'}</span></td>
-      </tr>
-    `;
-  }
+      let html = `
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Saisie</th>
+              <th>Type</th>
+              <th>Statut</th>
+              <th>Activité</th>
+              <th>Impression</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
 
-  html += '</tbody></table>';
-  container.innerHTML = html;
+      for (let i = data.rows.length - 1; i >= 0; i--) {
+        const v = data.rows[i];
+        const badgeType = v.statut === 'Abonné' ? 'badge-abo' : 'badge-nab';
+        const badgeImpr = v.impr === 'Oui' ? 'badge-yes' : 'badge-no';
+
+        html += `
+          <tr>
+            <td style="font-family:'DM Mono'; font-weight:600;">${v.heure}</td>
+            <td>${v.type}</td>
+            <td><span class="badge ${badgeType}">${v.statut}</span></td>
+            <td>${v.activite}${v.atelier ? ' (' + v.atelier + ')' : ''}</td>
+            <td><span class="badge ${badgeImpr}">${v.impr === 'Oui' ? 'Oui (' + v.nb_impr + ')' : 'Non'}</span></td>
+          </tr>
+        `;
+      }
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    })
+    .catch(err => {
+      container.innerHTML = '<div class="visits-empty"><p style="color:#F0AAAA;">❌ Erreur de chargement des données</p></div>';
+      console.error(err);
+    });
 }
 
-// Fonction vide car branchée à Google Apps Script (pour lecture des rapports)
 function loadRapport() {
   showToast("🔍 Chargement des rapports (Connecte ton Google Script)", "success");
-  // Cette fonction nécessitera de lire ton SCRIPT_URL par la suite !
 }
 </script>
 </body>
