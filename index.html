@@ -194,7 +194,6 @@
     <button class="tab-btn" onclick="showTab('rapport')" id="tab-rapport">📊 Rapport</button>
   </div>
 
-  <!-- ── ONGLET SAISIE ── -->
   <div class="tab-content active" id="content-saisie">
 
     <div class="correction-banner" id="correction-banner">
@@ -295,7 +294,6 @@
     </div>
   </div>
 
-  <!-- ── ONGLET VISITES DU JOUR ── -->
   <div class="tab-content" id="content-visites">
     <div class="visits-card">
       <div class="visits-header">
@@ -311,7 +309,6 @@
     </div>
   </div>
 
-  <!-- ── ONGLET RAPPORT ── -->
   <div class="tab-content" id="content-rapport">
     <div style="max-width:900px;margin:0 auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -349,17 +346,6 @@
 
 </main>
 
-<iframe id="hidden-frame" name="hidden-frame" style="display:none;width:0;height:0;border:none;"></iframe>
-<form id="hidden-form" method="GET" target="hidden-frame" style="display:none">
-  <input type="hidden" name="heure" id="f-heure">
-  <input type="hidden" name="type" id="f-type">
-  <input type="hidden" name="statut" id="f-statut">
-  <input type="hidden" name="activite" id="f-activite">
-  <input type="hidden" name="atelier" id="f-atelier">
-  <input type="hidden" name="impr" id="f-impr">
-  <input type="hidden" name="nb_impr" id="f-nb_impr">
-  <input type="hidden" name="remarques" id="f-remarques">
-</form>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -370,13 +356,18 @@ const MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','
 const now=new Date();
 document.getElementById('date-display').textContent=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
 
-function today(){return now.getFullYear()+'-'+now.getMonth()+'-'+now.getDate();}
+// MODIFICATION DU MOIS (+1) pour éviter que Janvier soit 0
+function today(){return now.getFullYear()+'-'+(now.getMonth()+1)+'-'+now.getDate();}
+
 let visitCount=parseInt(localStorage.getItem('visitCount_'+today())||'0');
+let imprCount=parseInt(localStorage.getItem('imprCount_'+today())||'0'); // Ajout du compteur d'impressions
 let lastEntry=JSON.parse(localStorage.getItem('lastEntry')||'null');
 let lastTime=parseInt(localStorage.getItem('lastTime')||'0');
 let timerInterval,correctionTimeout;
 const CORRECTION_MS=5*60*1000;
+
 document.getElementById('visit-count').textContent=visitCount;
+document.getElementById('impr-count').textContent=imprCount;
 
 document.querySelectorAll('.pill-grid').forEach(grid=>{
   grid.addEventListener('click',e=>{
@@ -422,6 +413,7 @@ function validate(){
 
 function submitForm(){
   if(!validate()){showToast('⚠️ Remplis tous les champs requis','error');return;}
+  
   const entry={
     heure:document.getElementById('sel-heure').value,
     type:getSelected('pills-type'),
@@ -429,19 +421,37 @@ function submitForm(){
     activite:getSelected('pills-activite'),
     atelier:document.getElementById('sel-atelier').value,
     impr:getSelected('pills-impr'),
-    nb_impr:document.getElementById('nb-impr').value||'',
+    nb_impr:document.getElementById('nb-impr').value||'0',
     remarques:document.getElementById('txt-remarques').value,
+    horodatage: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})
   };
+
   var params='heure='+encodeURIComponent(entry.heure)+'&type='+encodeURIComponent(entry.type)+'&statut='+encodeURIComponent(entry.statut)+'&activite='+encodeURIComponent(entry.activite)+'&atelier='+encodeURIComponent(entry.atelier)+'&impr='+encodeURIComponent(entry.impr)+'&nb_impr='+encodeURIComponent(entry.nb_impr)+'&remarques='+encodeURIComponent(entry.remarques);
   var img=new Image();img.src=SCRIPT_URL+'?'+params;
+
+  // Enregistrement des données de visite locales
   visitCount++;
   localStorage.setItem('visitCount_'+today(),visitCount);
   document.getElementById('visit-count').textContent=visitCount;
+
+  if (entry.impr === 'Oui') {
+    imprCount += parseInt(entry.nb_impr);
+    localStorage.setItem('imprCount_'+today(), imprCount);
+    document.getElementById('impr-count').textContent=imprCount;
+  }
+
+  // Historique pour l'onglet "Visites du jour"
+  let history = JSON.parse(localStorage.getItem('history_'+today()) || '[]');
+  history.push(entry);
+  localStorage.setItem('history_'+today(), JSON.stringify(history));
+
   localStorage.setItem('lastEntry',JSON.stringify(entry));
   localStorage.setItem('lastTime',Date.now().toString());
   lastEntry=entry;lastTime=Date.now();
+
   showToast('✓ Visite enregistrée !','success');
-  resetForm();showCorrectionBanner();
+  resetForm();
+  showCorrectionBanner();
 }
 
 function resetForm(){
@@ -467,9 +477,23 @@ function loadLastEntry(){
   if(lastEntry.activite==='Ateliers'){document.getElementById('atelier-section').classList.add('visible');document.getElementById('sel-atelier').value=lastEntry.atelier;}
   if(lastEntry.impr==='Oui'){document.getElementById('nb-wrap').classList.add('visible');document.getElementById('nb-impr').value=lastEntry.nb_impr;}
   document.getElementById('txt-remarques').value=lastEntry.remarques;
+
+  // Décrémentation car on est en correction
   visitCount=Math.max(0,visitCount-1);
   localStorage.setItem('visitCount_'+today(),visitCount);
   document.getElementById('visit-count').textContent=visitCount;
+
+  if (lastEntry.impr === 'Oui') {
+    imprCount = Math.max(0, imprCount - parseInt(lastEntry.nb_impr));
+    localStorage.setItem('imprCount_'+today(), imprCount);
+    document.getElementById('impr-count').textContent=imprCount;
+  }
+
+  // Retrait de la dernière visite de l'historique
+  let history = JSON.parse(localStorage.getItem('history_'+today()) || '[]');
+  history.pop();
+  localStorage.setItem('history_'+today(), JSON.stringify(history));
+
   updateDots();clearInterval(timerInterval);
   showToast('✏️ Saisie chargée — modifie et réenregistre','success');
   window.scrollTo({top:0,behavior:'smooth'});
@@ -502,188 +526,82 @@ if(lastEntry&&lastTime&&(Date.now()-lastTime)<CORRECTION_MS){
   },1000);
 }
 
-function showTab(tab){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
-  document.getElementById('tab-'+tab).classList.add('active');
-  document.getElementById('content-'+tab).classList.add('active');
-  if(tab==='visites') renderTable();
+// ── REPARATIONS ET AJOUTS DE LA COUPE DE FIN ──
+
+function showTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tabId).classList.add('active');
+  document.getElementById('content-' + tabId).classList.add('active');
+  
+  if(tabId === 'visites') {
+    renderTable();
+  }
 }
 
-// ── Visites du jour ───────────────────────────────────────────────────────
-let currentRows=[];
-
-function renderTable(){
-  const body=document.getElementById('visits-body');
-  body.innerHTML='<div class="visits-empty"><div style="font-size:24px">⏳</div><p style="margin-top:8px;font-size:12px">Chargement...</p></div>';
-  const ex=document.getElementById('jsonp-today');if(ex)ex.remove();
-  window._cbToday=function(data){
-    if(!data.rows||data.rows.length===0){
-      body.innerHTML='<div class="visits-empty"><div style="font-size:32px">📭</div><p style="margin-top:8px;font-size:12px">Aucune visite pour l\'instant</p></div>';
-      document.getElementById('visit-count').textContent=0;
-      document.getElementById('impr-count').textContent=0;
-      return;
-    }
-    currentRows=data.rows;buildTable(currentRows);
-  };
-  const s=document.createElement('script');s.id='jsonp-today';
-  s.src=SCRIPT_URL+'?action=getToday&callback=_cbToday';
-  s.onerror=()=>{body.innerHTML='<div class="visits-empty"><div style="font-size:32px">⚠️</div><p style="margin-top:8px;font-size:12px">Impossible de charger les données</p></div>';};
-  document.body.appendChild(s);
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
 }
 
-function buildTable(rows){
-  const body=document.getElementById('visits-body');
-  const ICONS={'Formation':'📚','Consultation':'🩺','Recherche':'🔍','Aide Bureautique':'💻','Aide Smartphone':'📱','Jeux Vidéos':'🎮','Ateliers':'🛠️'};
-  let html='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Heure</th><th>Profil</th><th>Statut</th><th>Activité</th><th>Impr.</th><th></th></tr></thead><tbody>';
-  let totalImpr=0;
-  rows.forEach((e,i)=>{
-    const icon=ICONS[e.activite]||'';
-    const statBadge=e.statut==='Abonné'?'<span class="badge badge-abo">✓ Abonné</span>":'<span class="badge badge-nab">Non ab.</span>';
-    const imprBadge=e.impr==='Oui'?'<span class="badge badge-yes">🖨️ '+(e.nb_impr||1)+'</span>":'<span class="badge badge-no">Non</span>';
-    if(e.impr==='Oui') totalImpr+=parseInt(e.nb_impr)||1;
-    html+='<tr><td style="color:#666;font-family:monospace">'+( i+1)+'</td><td style="font-weight:500;color:#EDE8E3">'+e.heure+'</td><td>'+e.type+'</td><td>'+statBadge+'</td><td>'+icon+' '+e.activite+(e.atelier?'<br><span style="font-size:10px;color:#666">'+e.atelier+'</span>':'')+'</td><td>'+imprBadge+'</td><td><button class="btn-delete" onclick="deleteRow('+i+')">✕</button></td></tr>';
-  });
-  html+='</tbody></table></div>';
-  body.innerHTML=html;
-  document.getElementById('visit-count').textContent=rows.length;
-  document.getElementById('impr-count').textContent=totalImpr;
-}
+// Génération du tableau dans "Visites du jour"
+function renderTable() {
+  const container = document.getElementById('visits-body');
+  const history = JSON.parse(localStorage.getItem('history_'+today()) || '[]');
 
-function deleteRow(index){
-  if(!confirm('Supprimer cette visite ?')) return;
-  currentRows.splice(index,1);
-  buildTable(currentRows);
-  showToast('🗑️ Visite supprimée','error');
-}
-
-// ── Rapport ───────────────────────────────────────────────────────────────
-(function(){
-  const n=new Date();
-  const mon=new Date(n);mon.setDate(n.getDate()-n.getDay()+1);
-  const fri=new Date(mon);fri.setDate(mon.getDate()+4);
-  function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-  document.getElementById('r-debut').value=fmt(mon);
-  document.getElementById('r-fin').value=fmt(fri);
-})();
-
-const JOURS2=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-const MOIS2=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-
-function loadRapport(){
-  const debut=document.getElementById('r-debut').value;
-  const fin=document.getElementById('r-fin').value;
-  if(!debut||!fin){alert('Sélectionne une période complète !');return;}
-  if(debut>fin){alert('La date de début doit être avant la date de fin !');return;}
-  const loading='<div class="r-empty"><div style="font-size:24px">⏳</div><p style="margin-top:8px;font-size:13px">Chargement...</p></div>';
-  document.getElementById('r-t1').innerHTML=loading;
-  document.getElementById('r-t2').innerHTML=loading;
-  document.getElementById('r-t3').innerHTML=loading;
-  document.getElementById('r-kpi').style.display='none';
-  const ex=document.getElementById('jsonp-rapport');if(ex)ex.remove();
-  window._cbRapport=function(data){
-    if(!data.rows){showRapportError();return;}
-    buildRapport(data.rows,debut,fin);
-  };
-  const s=document.createElement('script');s.id='jsonp-rapport';
-  s.src=SCRIPT_URL+'?action=getHistorique&debut='+debut+'&fin='+fin+'&callback=_cbRapport';
-  s.onerror=showRapportError;
-  document.body.appendChild(s);
-}
-
-function showRapportError(){
-  const msg='<div class="r-empty"><div style="font-size:32px">⚠️</div><p style="margin-top:8px;font-size:13px">Impossible de charger les données</p></div>';
-  ['r-t1','r-t2','r-t3'].forEach(id=>document.getElementById(id).innerHTML=msg);
-}
-
-function isMatin(h){return ['9h','10h','11h','12h'].includes(h);}
-function isApm(h){return ['14h','14h30','15h','15h30','16h','16h30','17h'].includes(h);}
-
-function buildRapport(rows,debut,fin){
-  const d1=new Date(debut),d2=new Date(fin);
-  const pStr='Du '+d1.getDate()+' '+MOIS2[d1.getMonth()]+' au '+d2.getDate()+' '+MOIS2[d2.getMonth()]+' '+d2.getFullYear();
-  document.getElementById('rapport-period-lbl').textContent=pStr;
-  const byDate={};
-  rows.forEach(r=>{
-    const k=r.date;
-    if(!byDate[k])byDate[k]={matin:0,apm:0,total:0,nbImpr:0,cout:0,types:{Homme:0,Femme:0,'Adolescent Garçon':0,'Adolescente Fille':0,'Enfant Garçon':0,'Enfant Fille':0}};
-    if(isMatin(r.heure))byDate[k].matin++;
-    if(isApm(r.heure))byDate[k].apm++;
-    byDate[k].total++;
-    if(byDate[k].types[r.type]!==undefined)byDate[k].types[r.type]++;
-    if(r.impr==='Oui'){const nb=parseInt(r.nb_impr)||1;byDate[k].nbImpr+=nb;byDate[k].cout+=nb*0.20;}
-  });
-  const dates=Object.keys(byDate).sort((a,b)=>{
-    const [da,ma,ya]=a.split('/').map(Number);
-    const [db,mb,yb]=b.split('/').map(Number);
-    return new Date(ya,ma-1,da)-new Date(yb,mb-1,db);
-  });
-  if(dates.length===0){
-    const msg='<div class="r-empty"><div style="font-size:32px">📭</div><p style="margin-top:8px;font-size:13px">Aucune visite sur cette période</p></div>';
-    ['r-t1','r-t2','r-t3'].forEach(id=>document.getElementById(id).innerHTML=msg);
+  if (history.length === 0) {
+    container.innerHTML = `
+      <div class="visits-empty">
+        <div style="font-size:32px">📭</div>
+        <p style="margin-top:8px;font-size:12px">Aucune visite enregistrée pour l'instant</p>
+      </div>
+    `;
     return;
   }
-  let totTotal=0,totMatin=0,totApm=0,totImpr=0,totCout=0;
-  dates.forEach(d=>{totTotal+=byDate[d].total;totMatin+=byDate[d].matin;totApm+=byDate[d].apm;totImpr+=byDate[d].nbImpr;totCout+=byDate[d].cout;});
-  document.getElementById('r-k-total').textContent=totTotal;
-  document.getElementById('r-k-matin').textContent=totMatin;
-  document.getElementById('r-k-apm').textContent=totApm;
-  document.getElementById('r-k-jours').textContent=dates.length;
-  document.getElementById('r-k-moy').textContent=Math.round(totTotal/dates.length*10)/10;
-  document.getElementById('r-k-impr').textContent=totImpr;
-  document.getElementById('r-k-cout').textContent=totCout.toFixed(2)+' €';
-  document.getElementById('r-kpi').style.display='grid';
-  document.getElementById('r-t1-sub').textContent=rows.length+' visites';
-  document.getElementById('r-t2-sub').textContent=rows.length+' visites';
-  document.getElementById('r-t3-sub').textContent=totImpr+' feuilles — '+totCout.toFixed(2)+' €';
-  // Tableau 1
-  let t1='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th><th>🌅 Matin<br><span style="font-weight:400;font-size:9px">9h–12h</span></th><th>🌇 Après-midi<br><span style="font-weight:400;font-size:9px">14h–17h</span></th><th>Total</th></tr></thead><tbody>';
-  dates.forEach(dk=>{
-    const d=byDate[dk];
-    const [day,month,year]=dk.split('/').map(Number);
-    const jour=JOURS2[new Date(year,month-1,day).getDay()];
-    t1+='<tr><td class="td-date">'+dk+'</td><td class="td-day">'+jour+'</td><td><span class="bm bm-teal">'+d.matin+'</span></td><td><span class="bm bm-amber">'+d.apm+'</span></td><td><span class="bm bm-tot">'+d.total+'</span></td></tr>';
-  });
-  t1+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td><td><span class="bm bm-teal">'+totMatin+'</span></td><td><span class="bm bm-amber">'+totApm+'</span></td><td><span class="bm bm-tot">'+totTotal+'</span></td></tr></tfoot></table></div>';
-  document.getElementById('r-t1').innerHTML=t1;
-  // Tableau 2
-  const TYPES=[{key:'Homme',label:'👨 Homme',cls:'ct-h'},{key:'Femme',label:'👩 Femme',cls:'ct-f'},{key:'Adolescent Garçon',label:'🧑 Ado G.',cls:'ct-ag'},{key:'Adolescente Fille',label:'👧 Ado F.',cls:'ct-af'},{key:'Enfant Garçon',label:'👦 Enf. G.',cls:'ct-eg'},{key:'Enfant Fille',label:'🧒 Enf. F.',cls:'ct-ef'}];
-  const totTypes={};TYPES.forEach(t=>totTypes[t.key]=0);
-  let t2='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th>';
-  TYPES.forEach(t=>{t2+='<th class="'+t.cls+'">'+t.label+'</th>';});
-  t2+='<th>Total</th></tr></thead><tbody>';
-  dates.forEach(dk=>{
-    const d=byDate[dk];
-    const [day,month,year]=dk.split('/').map(Number);
-    const jour=JOURS2[new Date(year,month-1,day).getDay()];
-    t2+='<tr><td class="td-date">'+dk+'</td><td class="td-day">'+jour+'</td>';
-    TYPES.forEach(t=>{const v=d.types[t.key]||0;totTypes[t.key]+=v;t2+='<td class="'+t.cls+'" style="font-weight:'+(v>0?'600':'400')+';opacity:'+(v>0?'1':'0.3')+'">'+v+'</td>';});
-    t2+='<td><span class="bm bm-tot">'+d.total+'</span></td></tr>';
-  });
-  t2+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td>';
-  TYPES.forEach(t=>{t2+='<td class="'+t.cls+'" style="font-weight:700">'+totTypes[t.key]+'</td>';});
-  t2+='<td><span class="bm bm-tot">'+totTotal+'</span></td></tr></tfoot></table></div>';
-  document.getElementById('r-t2').innerHTML=t2;
-  // Tableau 3
-  let t3='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th><th>🖨️ Feuilles</th><th>💰 Coût</th><th>Visites</th><th>% impr.</th></tr></thead><tbody>';
-  dates.forEach(dk=>{
-    const d=byDate[dk];
-    const [day,month,year]=dk.split('/').map(Number);
-    const jour=JOURS2[new Date(year,month-1,day).getDay()];
-    const pct=d.total>0?Math.round(d.nbImpr/d.total*100):0;
-    t3+='<tr><td class="td-date">'+dk+'</td><td class="td-day">'+jour+'</td><td><span class="bm bm-impr">'+d.nbImpr+'</span></td><td><span class="bm bm-cout">'+d.cout.toFixed(2)+' €</span></td><td><span class="bm bm-tot">'+d.total+'</span></td><td style="color:'+(pct>0?'#F0C8A0':'var(--muted)')+';font-weight:'+(pct>0?'600':'400')+'">'+pct+' %</td></tr>';
-  });
-  t3+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td><td><span class="bm bm-impr">'+totImpr+'</span></td><td><span class="bm bm-cout">'+totCout.toFixed(2)+' €</span></td><td><span class="bm bm-tot">'+totTotal+'</span></td><td style="color:#F0C8A0;font-weight:700">'+(totTotal>0?Math.round(totImpr/totTotal*100):0)+' %</td></tr></tfoot></table></div>';
-  document.getElementById('r-t3').innerHTML=t3;
+
+  let html = `
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Heure</th>
+          <th>Saisie</th>
+          <th>Type</th>
+          <th>Statut</th>
+          <th>Activité</th>
+          <th>Impr</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  // On lit à l'envers pour voir les plus récentes en haut
+  for (let i = history.length - 1; i >= 0; i--) {
+    const v = history[i];
+    const badgeType = v.statut === 'Abonné' ? 'badge-abo' : 'badge-nab';
+    const badgeImpr = v.impr === 'Oui' ? 'badge-yes' : 'badge-no';
+    
+    html += `
+      <tr>
+        <td style="font-family:'DM Mono'; font-weight:600;">${v.horodatage}</td>
+        <td>${v.heure}</td>
+        <td>${v.type}</td>
+        <td><span class="badge ${badgeType}">${v.statut}</span></td>
+        <td>${v.activite}${v.atelier ? ' ('+v.atelier+')' : ''}</td>
+        <td><span class="badge ${badgeImpr}">${v.impr === 'Oui' ? 'Oui ('+v.nb_impr+')' : 'Non'}</span></td>
+      </tr>
+    `;
+  }
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
-let toastTimer;
-function showToast(msg,type=''){
-  const t=document.getElementById('toast');
-  t.textContent=msg;
-  t.className='toast show'+(type?' '+type:'');
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
+// Fonction vide car branchée à Google Apps Script (pour lecture des rapports)
+function loadRapport() {
+  showToast("🔍 Chargement des rapports (Connecte ton Google Script)", "success");
+  // Cette fonction nécessitera de lire ton SCRIPT_URL par la suite !
 }
 </script>
 </body>
