@@ -180,8 +180,8 @@
       <div class="counter-lbl">visites</div>
     </div>
     <div class="counter-impr">
-      <div class="counter-impr-num" id="impr-count">0</div>
-      <div class="counter-impr-lbl">🖨️ impr.</div>
+      <div class="counter-num" id="impr-count">0</div>
+      <div class="counter-lbl">🖨️ impr.</div>
     </div>
   </div>
 </header>
@@ -349,6 +349,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ⚠️ METS TON LIEN GOOGLE APPS SCRIPT ICI !
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2k5FNBbmLXp84-3WrXrPg5xyXTupmrn7QJ--8NyPR4UMzw978VDSqK9LN8iNa8odnPA/exec';
 
 const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
@@ -406,7 +407,6 @@ function validate(){
   return ok;
 }
 
-// ✅ CORRECTION ICI : Envoi robuste synchrone via JSONP vers Google Sheets
 function submitForm(){
   if(!validate()){showToast('⚠️ Remplis tous les champs requis','error');return;}
   const entry={
@@ -431,7 +431,7 @@ function submitForm(){
       lastEntry=entry;lastTime=Date.now();
       showToast('✓ Visite enregistrée dans Google Sheets !','success');
       resetForm();showCorrectionBanner();
-      renderTable(); // actualise la table tout de suite
+      renderTable();
     } else {
       showToast('⚠️ Problème serveur à la sauvegarde.','error');
     }
@@ -517,7 +517,6 @@ function showTab(tab){
   if(tab==='visites') renderTable();
 }
 
-// ── Visites du jour ───────────────────────────────────────────────────────
 let currentRows=[];
 
 function renderTable(){
@@ -547,8 +546,12 @@ function buildTable(rows){
   rows.forEach((e,i)=>{
     const icon=ICONS[e.activite]||'';
     const statBadge=e.statut==='Abonné'?'<span class="badge badge-abo">✓ Abonné</span>':'<span class="badge badge-nab">Non ab.</span>';
-    const imprBadge=e.impr==='Oui'?'<span class="badge badge-yes">🖨️ '+(e.nb_impr||1)+'</span>':'<span class="badge badge-no">Non</span>';
-    if(e.impr==='Oui') totalImpr+=parseInt(e.nb_impr)||1;
+    
+    // ✅ CORRECTION 1 ICI : On teste si e.impr contient "Oui"
+    const isImpr = e.impr && e.impr.toString().startsWith('Oui');
+    const imprBadge=isImpr?'<span class="badge badge-yes">🖨️ '+(e.nb_impr||1)+'</span>':'<span class="badge badge-no">Non</span>';
+    if(isImpr) totalImpr+=parseInt(e.nb_impr)||1;
+
     html+='<tr><td style="color:#666;font-family:monospace">'+(i+1)+'</td><td style="font-weight:500;color:#EDE8E3">'+e.heure+'</td><td>'+e.type+'</td><td>'+statBadge+'</td><td>'+icon+' '+e.activite+(e.atelier?'<br><span style="font-size:10px;color:#666">'+e.atelier+'</span>':'')+'</td><td>'+imprBadge+'</td><td><button class="btn-delete" onclick="deleteRow('+i+')">✕</button></td></tr>';
   });
   html+='</tbody></table></div>';
@@ -564,7 +567,6 @@ function deleteRow(index){
   showToast('🗑️ Visite supprimée','error');
 }
 
-// ── Rapport ───────────────────────────────────────────────────────────────
 (function(){
   const n=new Date();
   const mon=new Date(n);mon.setDate(n.getDate()-n.getDay()+1);
@@ -618,7 +620,13 @@ function buildRapport(rows,debut,fin){
     if(isApm(r.heure))byDate[k].apm++;
     byDate[k].total++;
     if(byDate[k].types[r.type]!==undefined)byDate[k].types[r.type]++;
-    if(r.impr==='Oui'){const nb=parseInt(r.nb_impr)||1;byDate[k].nbImpr+=nb;byDate[k].cout+=nb*0.20;}
+    
+    // ✅ CORRECTION 2 ICI : On teste si l'impression commence par "Oui"
+    if(r.impr && r.impr.toString().startsWith('Oui')){
+      const nb=parseInt(r.nb_impr)||1;
+      byDate[k].nbImpr+=nb;
+      byDate[k].cout+=nb*0.20;
+    }
   });
   const dates=Object.keys(byDate).sort((a,b)=>{
     const [da,ma,ya]=a.split('/').map(Number);
