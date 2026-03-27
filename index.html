@@ -349,7 +349,6 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ⚠️ METS TON LIEN DE DEPLOIEMENT GOOGLE APPS SCRIPT ICI !
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2k5FNBbmLXp84-3WrXrPg5xyXTupmrn7QJ--8NyPR4UMzw978VDSqK9LN8iNa8odnPA/exec';
 
 const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
@@ -358,16 +357,12 @@ const now=new Date();
 document.getElementById('date-display').textContent=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
 
 function today(){return now.getFullYear()+'-'+(now.getMonth()+1)+'-'+now.getDate();}
-
 let visitCount=parseInt(localStorage.getItem('visitCount_'+today())||'0');
-let imprCount=parseInt(localStorage.getItem('imprCount_'+today())||'0');
 let lastEntry=JSON.parse(localStorage.getItem('lastEntry')||'null');
 let lastTime=parseInt(localStorage.getItem('lastTime')||'0');
 let timerInterval,correctionTimeout;
 const CORRECTION_MS=5*60*1000;
-
 document.getElementById('visit-count').textContent=visitCount;
-document.getElementById('impr-count').textContent=imprCount;
 
 document.querySelectorAll('.pill-grid').forEach(grid=>{
   grid.addEventListener('click',e=>{
@@ -411,10 +406,9 @@ function validate(){
   return ok;
 }
 
-// ✅ MODIFICATION DE SUBMITFORM POUR PARLER À GOOGLE SHEETS EN METHODE MODERNE FETCH
+// ✅ CORRECTION ICI : Envoi robuste synchrone via JSONP vers Google Sheets
 function submitForm(){
   if(!validate()){showToast('⚠️ Remplis tous les champs requis','error');return;}
-  
   const entry={
     heure:document.getElementById('sel-heure').value,
     type:getSelected('pills-type'),
@@ -423,48 +417,38 @@ function submitForm(){
     atelier:document.getElementById('sel-atelier').value,
     impr:getSelected('pills-impr'),
     nb_impr:document.getElementById('nb-impr').value||'0',
-    remarques:document.getElementById('txt-remarques').value
+    remarques:document.getElementById('txt-remarques').value,
   };
 
-  const url = SCRIPT_URL + '?' +
-    'heure=' + encodeURIComponent(entry.heure) +
-    '&type=' + encodeURIComponent(entry.type) +
-    '&statut=' + encodeURIComponent(entry.statut) +
-    '&activite=' + encodeURIComponent(entry.activite) +
-    '&atelier=' + encodeURIComponent(entry.atelier) +
-    '&impr=' + encodeURIComponent(entry.impr) +
-    '&nb_impr=' + encodeURIComponent(entry.nb_impr) +
-    '&remarques=' + encodeURIComponent(entry.remarques);
-
-  fetch(url, { method: 'GET', mode: 'no-cors' })
-    .then(() => {
+  const ex=document.getElementById('jsonp-submit'); if(ex) ex.remove();
+  window._cbSubmit=function(response){
+    if(response.status==='ok'){
       visitCount++;
-      localStorage.setItem('visitCount_'+today(), visitCount);
-      document.getElementById('visit-count').textContent = visitCount;
+      localStorage.setItem('visitCount_'+today(),visitCount);
+      document.getElementById('visit-count').textContent=visitCount;
+      localStorage.setItem('lastEntry',JSON.stringify(entry));
+      localStorage.setItem('lastTime',Date.now().toString());
+      lastEntry=entry;lastTime=Date.now();
+      showToast('✓ Visite enregistrée dans Google Sheets !','success');
+      resetForm();showCorrectionBanner();
+      renderTable(); // actualise la table tout de suite
+    } else {
+      showToast('⚠️ Problème serveur à la sauvegarde.','error');
+    }
+  };
 
-      if (entry.impr === 'Oui') {
-        imprCount += parseInt(entry.nb_impr);
-        localStorage.setItem('imprCount_'+today(), imprCount);
-        document.getElementById('impr-count').textContent = imprCount;
-      }
-
-      localStorage.setItem('lastEntry', JSON.stringify(entry));
-      localStorage.setItem('lastTime', Date.now().toString());
-      lastEntry = entry; lastTime = Date.now();
-
-      showToast('✓ Visite enregistrée dans Google Sheets !', 'success');
-      resetForm();
-      showCorrectionBanner();
-      
-      // On rafraîchit le tableau des visites du jour immédiatement
-      if(document.getElementById('tab-visites').classList.contains('active')) {
-        renderTable();
-      }
-    })
-    .catch(err => {
-      showToast('❌ Erreur de connexion au script', 'error');
-      console.error(err);
-    });
+  const s=document.createElement('script'); s.id='jsonp-submit';
+  s.src=SCRIPT_URL+'?heure='+encodeURIComponent(entry.heure)+
+                   '&type='+encodeURIComponent(entry.type)+
+                   '&statut='+encodeURIComponent(entry.statut)+
+                   '&activite='+encodeURIComponent(entry.activite)+
+                   '&atelier='+encodeURIComponent(entry.atelier)+
+                   '&impr='+encodeURIComponent(entry.impr)+
+                   '&nb_impr='+encodeURIComponent(entry.nb_impr)+
+                   '&remarques='+encodeURIComponent(entry.remarques)+
+                   '&callback=_cbSubmit';
+  s.onerror=()=>{showToast('❌ Impossible de joindre Google Sheets !','error');};
+  document.body.appendChild(s);
 }
 
 function resetForm(){
@@ -490,19 +474,11 @@ function loadLastEntry(){
   if(lastEntry.activite==='Ateliers'){document.getElementById('atelier-section').classList.add('visible');document.getElementById('sel-atelier').value=lastEntry.atelier;}
   if(lastEntry.impr==='Oui'){document.getElementById('nb-wrap').classList.add('visible');document.getElementById('nb-impr').value=lastEntry.nb_impr;}
   document.getElementById('txt-remarques').value=lastEntry.remarques;
-
   visitCount=Math.max(0,visitCount-1);
   localStorage.setItem('visitCount_'+today(),visitCount);
   document.getElementById('visit-count').textContent=visitCount;
-
-  if (lastEntry.impr === 'Oui') {
-    imprCount = Math.max(0, imprCount - parseInt(lastEntry.nb_impr));
-    localStorage.setItem('imprCount_'+today(), imprCount);
-    document.getElementById('impr-count').textContent=imprCount;
-  }
-
   updateDots();clearInterval(timerInterval);
-  showToast('✏️ Saisie chargée — modifie et réenregistre', 'success');
+  showToast('✏️ Saisie chargée — modifie et réenregistre','success');
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -533,211 +509,191 @@ if(lastEntry&&lastTime&&(Date.now()-lastTime)<CORRECTION_MS){
   },1000);
 }
 
-function showTab(tabId) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-' + tabId).classList.add('active');
-  document.getElementById('content-' + tabId).classList.add('active');
-  
-  if(tabId === 'visites') {
-    renderTable();
-  }
+function showTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('content-'+tab).classList.add('active');
+  if(tab==='visites') renderTable();
 }
 
-function showToast(msg, type) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + type;
-  setTimeout(() => { t.className = 'toast'; }, 3000);
+// ── Visites du jour ───────────────────────────────────────────────────────
+let currentRows=[];
+
+function renderTable(){
+  const body=document.getElementById('visits-body');
+  body.innerHTML='<div class="visits-empty"><div style="font-size:24px">⏳</div><p style="margin-top:8px;font-size:12px">Chargement...</p></div>';
+  const ex=document.getElementById('jsonp-today');if(ex)ex.remove();
+  window._cbToday=function(data){
+    if(!data.rows||data.rows.length===0){
+      body.innerHTML='<div class="visits-empty"><div style="font-size:32px">📭</div><p style="margin-top:8px;font-size:12px">Aucune visite pour l\'instant</p></div>';
+      document.getElementById('visit-count').textContent=0;
+      document.getElementById('impr-count').textContent=0;
+      return;
+    }
+    currentRows=data.rows;buildTable(currentRows);
+  };
+  const s=document.createElement('script');s.id='jsonp-today';
+  s.src=SCRIPT_URL+'?action=getToday&callback=_cbToday';
+  s.onerror=()=>{body.innerHTML='<div class="visits-empty"><div style="font-size:32px">⚠️</div><p style="margin-top:8px;font-size:12px">Impossible de charger les données</p></div>';};
+  document.body.appendChild(s);
 }
 
-// ✅ LIRE EN DIRECT LES VISITES DU JOUR DEPUIS GOOGLE SHEETS
-function renderTable() {
-  const container = document.getElementById('visits-body');
-  container.innerHTML = '<div class="visits-empty"><p>🔄 Chargement depuis Google Sheets...</p></div>';
-
-  const url = SCRIPT_URL + '?action=getToday';
-
-  fetch(url)
-    .then(response => response.json())
-    .then(data => {
-      if (data.status !== "ok" || !data.rows || data.rows.length === 0) {
-        container.innerHTML = `
-          <div class="visits-empty">
-            <div style="font-size:32px">📭</div>
-            <p style="margin-top:8px;font-size:12px">Aucune visite dans Google Sheets aujourd'hui</p>
-          </div>
-        `;
-        return;
-      }
-
-      let html = `
-        <table class="tbl">
-          <thead>
-            <tr>
-              <th>Saisie</th>
-              <th>Type</th>
-              <th>Statut</th>
-              <th>Activité</th>
-              <th>Impression</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-
-      for (let i = data.rows.length - 1; i >= 0; i--) {
-        const v = data.rows[i];
-        const badgeType = v.statut === 'Abonné' ? 'badge-abo' : 'badge-nab';
-        const badgeImpr = v.impr === 'Oui' ? 'badge-yes' : 'badge-no';
-
-        html += `
-          <tr>
-            <td style="font-family:'DM Mono'; font-weight:600;">${v.heure}</td>
-            <td>${v.type}</td>
-            <td><span class="badge ${badgeType}">${v.statut}</span></td>
-            <td>${v.activite}${v.atelier ? ' (' + v.atelier + ')' : ''}</td>
-            <td><span class="badge ${badgeImpr}">${v.impr === 'Oui' ? 'Oui (' + v.nb_impr + ')' : 'Non'}</span></td>
-          </tr>
-        `;
-      }
-
-      html += '</tbody></table>';
-      container.innerHTML = html;
-    })
-    .catch(err => {
-      container.innerHTML = '<div class="visits-empty"><p style="color:#F0AAAA;">❌ Erreur de chargement des données</p></div>';
-      console.error(err);
-    });
+function buildTable(rows){
+  const body=document.getElementById('visits-body');
+  const ICONS={'Formation':'📚','Consultation':'🩺','Recherche':'🔍','Aide Bureautique':'💻','Aide Smartphone':'📱','Jeux Vidéos':'🎮','Ateliers':'🛠️'};
+  let html='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>#</th><th>Heure</th><th>Profil</th><th>Statut</th><th>Activité</th><th>Impr.</th><th></th></tr></thead><tbody>';
+  let totalImpr=0;
+  rows.forEach((e,i)=>{
+    const icon=ICONS[e.activite]||'';
+    const statBadge=e.statut==='Abonné'?'<span class="badge badge-abo">✓ Abonné</span>':'<span class="badge badge-nab">Non ab.</span>';
+    const imprBadge=e.impr==='Oui'?'<span class="badge badge-yes">🖨️ '+(e.nb_impr||1)+'</span>':'<span class="badge badge-no">Non</span>';
+    if(e.impr==='Oui') totalImpr+=parseInt(e.nb_impr)||1;
+    html+='<tr><td style="color:#666;font-family:monospace">'+(i+1)+'</td><td style="font-weight:500;color:#EDE8E3">'+e.heure+'</td><td>'+e.type+'</td><td>'+statBadge+'</td><td>'+icon+' '+e.activite+(e.atelier?'<br><span style="font-size:10px;color:#666">'+e.atelier+'</span>':'')+'</td><td>'+imprBadge+'</td><td><button class="btn-delete" onclick="deleteRow('+i+')">✕</button></td></tr>';
+  });
+  html+='</tbody></table></div>';
+  body.innerHTML=html;
+  document.getElementById('visit-count').textContent=rows.length;
+  document.getElementById('impr-count').textContent=totalImpr;
 }
 
-function loadRapport() {
-  const debut = document.getElementById('r-debut').value;
-  const fin = document.getElementById('r-fin').value;
+function deleteRow(index){
+  if(!confirm('Supprimer cette visite ?')) return;
+  currentRows.splice(index,1);
+  buildTable(currentRows);
+  showToast('🗑️ Visite supprimée','error');
+}
 
-  if (!debut || !fin) {
-    showToast("⚠️ Sélectionne une date de début et de fin !", "error");
+// ── Rapport ───────────────────────────────────────────────────────────────
+(function(){
+  const n=new Date();
+  const mon=new Date(n);mon.setDate(n.getDate()-n.getDay()+1);
+  const fri=new Date(mon);fri.setDate(mon.getDate()+4);
+  function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  document.getElementById('r-debut').value=fmt(mon);
+  document.getElementById('r-fin').value=fmt(fri);
+})();
+
+const JOURS2=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MOIS2=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+
+function loadRapport(){
+  const debut=document.getElementById('r-debut').value;
+  const fin=document.getElementById('r-fin').value;
+  if(!debut||!fin){alert('Sélectionne une période complète !');return;}
+  if(debut>fin){alert('La date de début doit être avant la date de fin !');return;}
+  const loading='<div class="r-empty"><div style="font-size:24px">⏳</div><p style="margin-top:8px;font-size:13px">Chargement...</p></div>';
+  document.getElementById('r-t1').innerHTML=loading;
+  document.getElementById('r-t2').innerHTML=loading;
+  document.getElementById('r-t3').innerHTML=loading;
+  document.getElementById('r-kpi').style.display='none';
+  const ex=document.getElementById('jsonp-rapport');if(ex)ex.remove();
+  window._cbRapport=function(data){
+    if(!data.rows){showRapportError();return;}
+    buildRapport(data.rows,debut,fin);
+  };
+  const s=document.createElement('script');s.id='jsonp-rapport';
+  s.src=SCRIPT_URL+'?action=getHistorique&debut='+debut+'&fin='+fin+'&callback=_cbRapport';
+  s.onerror=showRapportError;
+  document.body.appendChild(s);
+}
+
+function showRapportError(){
+  const msg='<div class="r-empty"><div style="font-size:32px">⚠️</div><p style="margin-top:8px;font-size:13px">Impossible de charger les données</p></div>';
+  ['r-t1','r-t2','r-t3'].forEach(id=>document.getElementById(id).innerHTML=msg);
+}
+
+function isMatin(h){return ['9h','10h','11h','12h'].includes(h);}
+function isApm(h){return ['14h','14h30','15h','15h30','16h','16h30','17h'].includes(h);}
+
+function buildRapport(rows,debut,fin){
+  const d1=new Date(debut),d2=new Date(fin);
+  const pStr='Du '+d1.getDate()+' '+MOIS2[d1.getMonth()]+' au '+d2.getDate()+' '+MOIS2[d2.getMonth()]+' '+d2.getFullYear();
+  document.getElementById('rapport-period-lbl').textContent=pStr;
+  const byDate={};
+  rows.forEach(r=>{
+    const k=r.date;
+    if(!byDate[k])byDate[k]={matin:0,apm:0,total:0,nbImpr:0,cout:0,types:{Homme:0,Femme:0,'Adolescent Garçon':0,'Adolescente Fille':0,'Enfant Garçon':0,'Enfant Fille':0}};
+    if(isMatin(r.heure))byDate[k].matin++;
+    if(isApm(r.heure))byDate[k].apm++;
+    byDate[k].total++;
+    if(byDate[k].types[r.type]!==undefined)byDate[k].types[r.type]++;
+    if(r.impr==='Oui'){const nb=parseInt(r.nb_impr)||1;byDate[k].nbImpr+=nb;byDate[k].cout+=nb*0.20;}
+  });
+  const dates=Object.keys(byDate).sort((a,b)=>{
+    const [da,ma,ya]=a.split('/').map(Number);
+    const [db,mb,yb]=b.split('/').map(Number);
+    return new Date(ya,ma-1,da)-new Date(yb,mb-1,db);
+  });
+  if(dates.length===0){
+    const msg='<div class="r-empty"><div style="font-size:32px">📭</div><p style="margin-top:8px;font-size:13px">Aucune visite sur cette période</p></div>';
+    ['r-t1','r-t2','r-t3'].forEach(id=>document.getElementById(id).innerHTML=msg);
     return;
   }
-
-  showToast("🔍 Calcul du rapport en cours...", "success");
-
-  const url = SCRIPT_URL + '?action=getHistorique&debut=' + debut + '&fin=' + fin;
-
-  fetch(url)
-    .then(response => response.json())
-    .then(data => {
-      if (data.status !== "ok" || !data.rows || data.rows.length === 0) {
-        showToast("📭 Aucune donnée trouvée pour cette période", "error");
-        resetRapportView();
-        return;
-      }
-
-      calculerEtAfficherRapport(data.rows, debut, fin);
-    })
-    .catch(err => {
-      showToast("❌ Erreur de chargement du rapport", "error");
-      console.error(err);
-    });
-}
-
-// Remet les tableaux à zéro si aucune donnée trouvée
-function resetRapportView() {
-  document.getElementById('r-kpi').style.display = 'none';
-  const emptyState = '<div class="r-empty"><div style="font-size:32px">📅</div><p style="margin-top:8px;font-size:13px">Aucune donnée trouvée</p></div>';
-  document.getElementById('r-t1').innerHTML = emptyState;
-  document.getElementById('r-t2').innerHTML = emptyState;
-  document.getElementById('r-t3').innerHTML = emptyState;
-}
-
-// Génère les calculs et dessine les 3 tableaux
-function calculerEtAfficherRapport(rows, dateDebut, dateFin) {
-  // --- 📊 1. CALCULS DES KPI ---
-  let totalVisites = rows.length;
-  let matin = 0, apm = 0, imprTotal = 0;
-  let datesUniques = new Set();
+  let totTotal=0,totMatin=0,totApm=0,totImpr=0,totCout=0;
+  dates.forEach(d=>{totTotal+=byDate[d].total;totMatin+=byDate[d].matin;totApm+=byDate[d].apm;totImpr+=byDate[d].nbImpr;totCout+=byDate[d].cout;});
+  document.getElementById('r-k-total').textContent=totTotal;
+  document.getElementById('r-k-matin').textContent=totMatin;
+  document.getElementById('r-k-apm').textContent=totApm;
+  document.getElementById('r-k-jours').textContent=dates.length;
+  document.getElementById('r-k-moy').textContent=Math.round(totTotal/dates.length*10)/10;
+  document.getElementById('r-k-impr').textContent=totImpr;
+  document.getElementById('r-k-cout').textContent=totCout.toFixed(2)+' €';
+  document.getElementById('r-kpi').style.display='grid';
+  document.getElementById('r-t1-sub').textContent=rows.length+' visites';
+  document.getElementById('r-t2-sub').textContent=rows.length+' visites';
+  document.getElementById('r-t3-sub').textContent=totImpr+' feuilles — '+totCout.toFixed(2)+' €';
   
-  // Regroupements pour les tableaux
-  let syntheseJours = {}; // { "25/03/2026": { matin: 0, apm: 0, H: 0, F: 0, AG: 0, AF: 0, EG: 0, EF: 0, impr: 0 } }
-
-  rows.forEach(r => {
-    const date = r.date;
-    datesUniques.add(date);
-
-    if (!syntheseJours[date]) {
-      syntheseJours[date] = { matin: 0, apm: 0, Homme: 0, Femme: 0, "Adolescent Garçon": 0, "Adolescente Fille": 0, "Enfant Garçon": 0, "Enfant Fille": 0, impr: 0 };
-    }
-
-    // Heure (Matin vs Après-midi)
-    const hInt = parseInt(r.heure);
-    if (hInt < 14) { matin++; syntheseJours[date].matin++; } 
-    else { apm++; syntheseJours[date].apm++; }
-
-    // Type de personne
-    if (syntheseJours[date][r.type] !== undefined) {
-      syntheseJours[date][r.type]++;
-    }
-
-    // Impressions
-    if (r.impr === "Oui") {
-      const nb = parseInt(r.nb_impr) || 0;
-      imprTotal += nb;
-      syntheseJours[date].impr += nb;
-    }
+  // Tableau 1
+  let t1='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th><th>🌅 Matin<br><span style="font-weight:400;font-size:9px">9h–12h</span></th><th>🌇 Après-midi<br><span style="font-weight:400;font-size:9px">14h–17h</span></th><th>Total</th></tr></thead><tbody>';
+  dates.forEach(dk=>{
+    const d=byDate[dk];
+    const [day,month,year]=dk.split('/').map(Number);
+    const jour=JOURS2[new Date(year,month-1,day).getDay()];
+    t1+='<tr><td class="td-date">'+dk+'</td><td class="td-day">'+jour+'</td><td><span class="bm bm-teal">'+d.matin+'</span></td><td><span class="bm bm-amber">'+d.apm+'</span></td><td><span class="bm bm-tot">'+d.total+'</span></td></tr>';
   });
-
-  const nbJours = datesUniques.size || 1;
-  const moyenne = (totalVisites / nbJours).toFixed(1);
-  const coutEstim = (imprTotal * 0.15).toFixed(2); // Estimation 0.15€ par page imprimée
-
-  // --- Affichage des KPI ---
-  document.getElementById('r-kpi').style.display = 'grid';
-  document.getElementById('r-k-total').textContent = totalVisites;
-  document.getElementById('r-k-matin').textContent = matin;
-  document.getElementById('r-k-apm').textContent = apm;
-  document.getElementById('r-k-jours').textContent = nbJours;
-  document.getElementById('r-k-moy').textContent = moyenne;
-  document.getElementById('r-k-impr').textContent = imprTotal;
-  document.getElementById('r-k-cout').textContent = coutEstim + "€";
-
-  // Tri des dates du plus récent au plus ancien pour les tableaux
-  const joursTries = Object.keys(syntheseJours).sort((a,b) => {
-    const pA = a.split('/'), pB = b.split('/');
-    return new Date(pB[2], pB[1]-1, pB[0]) - new Date(pA[2], pA[1]-1, pA[0]);
+  t1+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td><td><span class="bm bm-teal">'+totMatin+'</span></td><td><span class="bm bm-amber">'+totApm+'</span></td><td><span class="bm bm-tot">'+totTotal+'</span></td></tr></tfoot></table></div>';
+  document.getElementById('r-t1').innerHTML=t1;
+  
+  // Tableau 2
+  const TYPES=[{key:'Homme',label:'👨 Homme',cls:'ct-h'},{key:'Femme',label:'👩 Femme',cls:'ct-f'},{key:'Adolescent Garçon',label:'🧑 Ado G.',cls:'ct-ag'},{key:'Adolescente Fille',label:'👧 Ado F.',cls:'ct-af'},{key:'Enfant Garçon',label:'👦 Enf. G.',cls:'ct-eg'},{key:'Enfant Fille',label:'🧒 Enf. F.',cls:'ct-ef'}];
+  const totTypes={};TYPES.forEach(t=>totTypes[t.key]=0);
+  let t2='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th>';
+  TYPES.forEach(t=>{t2+='<th class="'+t.cls+'">'+t.label+'</th>';});
+  t2+='<th>Total</th></tr></thead><tbody>';
+  dates.forEach(dk=>{
+    const d=byDate[dk];
+    const [day,month,year]=dk.split('/').map(Number);
+    const jour=JOURS2[new Date(year,month-1,day).getDay()];
+    t2+='<tr><td class="td-date">'+dk+'</td><td class="td-day">'+jour+'</td>';
+    TYPES.forEach(t=>{const v=d.types[t.key]||0;totTypes[t.key]+=v;t2+='<td class="'+t.cls+'" style="font-weight:'+(v>0?'600':'400')+';opacity:'+(v>0?'1':'0.3')+'">'+v+'</td>';});
+    t2+='<td><span class="bm bm-tot">'+d.total+'</span></td></tr>';
   });
-
-  // --- 📉 TABLEAU 1 : Matin / Après-midi ---
-  let h1 = '<table class="rtbl"><thead><tr><th class="thl">Date</th><th>Matin</th><th>Après-midi</th><th>Total</th></tr></thead><tbody>';
-  joursTries.forEach(j => {
-    const d = syntheseJours[j];
-    h1 += `<tr><td class="td-date">${j}</td><td><span class="bm bm-teal">${d.matin}</span></td><td><span class="bm bm-amber">${d.apm}</span></td><td><span class="bm bm-tot">${d.matin + d.apm}</span></td></tr>`;
+  t2+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td>';
+  TYPES.forEach(t=>{t2+='<td class="'+t.cls+'" style="font-weight:700">'+totTypes[t.key]+'</td>';});
+  t2+='<td><span class="bm bm-tot">'+totTotal+'</span></td></tr></tfoot></table></div>';
+  document.getElementById('r-t2').innerHTML=t2;
+  
+  // Tableau 3
+  let t3='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th><th>🖨️ Feuilles</th><th>💰 Coût</th><th>Visites</th><th>% impr.</th></tr></thead><tbody>';
+  dates.forEach(dk=>{
+    const d=byDate[dk];
+    const [day,month,year]=dk.split('/').map(Number);
+    const jour=JOURS2[new Date(year,month-1,day).getDay()];
+    const pct=d.total>0?Math.round(d.nbImpr/d.total*100):0;
+    t3+='<tr><td class="td-date">'+dk+'</td><td class="td-day">'+jour+'</td><td><span class="bm bm-impr">'+d.nbImpr+'</span></td><td><span class="bm bm-cout">'+d.cout.toFixed(2)+' €</span></td><td><span class="bm bm-tot">'+d.total+'</span></td><td style="color:'+(pct>0?'#F0C8A0':'var(--muted)')+';font-weight:'+(pct>0?'600':'400')+'">'+pct+' %</td></tr>';
   });
-  h1 += '</tbody></table>';
-  document.getElementById('r-t1').innerHTML = h1;
-
-  // --- 👥 TABLEAU 2 : Types de personnes ---
-  let h2 = '<table class="rtbl"><thead><tr><th class="thl">Date</th><th>👨 H</th><th>👩 F</th><th>🧑 A-G</th><th>👧 A-F</th><th>👦 E-G</th><th>🧒 E-F</th></tr></thead><tbody>';
-  joursTries.forEach(j => {
-    const d = syntheseJours[j];
-    h2 += `<tr><td class="td-date">${j}</td>
-      <td class="ct-h">${d.Homme}</td><td class="ct-f">${d.Femme}</td>
-      <td class="ct-ag">${d["Adolescent Garçon"]}</td><td class="ct-af">${d["Adolescente Fille"]}</td>
-      <td class="ct-eg">${d["Enfant Garçon"]}</td><td class="ct-ef">${d["Enfant Fille"]}</td>
-    </tr>`;
-  });
-  h2 += '</tbody></table>';
-  document.getElementById('r-t2').innerHTML = h2;
-
-  // --- 🖨️ TABLEAU 3 : Impressions ---
-  let h3 = '<table class="rtbl"><thead><tr><th class="thl">Date</th><th>Impressions</th><th>Coût Estimé</th></tr></thead><tbody>';
-  joursTries.forEach(j => {
-    const d = syntheseJours[j];
-    h3 += `<tr><td class="td-date">${j}</td><td><span class="bm bm-impr">${d.impr}</span></td><td><span class="bm bm-cout">${(d.impr * 0.15).toFixed(2)} €</span></td></tr>`;
-  });
-  h3 += '</tbody></table>';
-  document.getElementById('r-t3').innerHTML = h3;
-
-  showToast("✅ Rapports générés avec succès !", "success");
+  t3+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td><td><span class="bm bm-impr">'+totImpr+'</span></td><td><span class="bm bm-cout">'+totCout.toFixed(2)+' €</span></td><td><span class="bm bm-tot">'+totTotal+'</span></td><td style="color:#F0C8A0;font-weight:700">'+(totTotal>0?Math.round(totImpr/totTotal*100):0)+' %</td></tr></tfoot></table></div>';
+  document.getElementById('r-t3').innerHTML=t3;
 }
+
+let toastTimer;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
 }
 </script>
 </body>
