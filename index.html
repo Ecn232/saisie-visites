@@ -35,9 +35,9 @@
   .styled-select:focus{outline:none;border-color:#A8D8D8;}
   .styled-select option{background:#252525;color:#EDE8E3;}
   .pill-grid{display:flex;flex-wrap:wrap;gap:8px;}
-  .pill{padding:8px 16px;border-radius:24px;font-size:13px;cursor:pointer;border:2px solid;transition:all 0.15s;user-select:none;display:flex;align-items:center;gap:5px;opacity:0.35;filter:saturate(0.4);}
-  .pill:hover{opacity:0.65;filter:saturate(0.7);transform:translateY(-1px);}
-  .pill.selected{font-weight:700;transform:translateY(-2px);opacity:1;filter:saturate(1);box-shadow:0 4px 16px rgba(0,0,0,0.6);}
+  .pill{padding:8px 16px;border-radius:24px;font-size:13px;cursor:pointer;border:2px solid;transition:all 0.15s;user-select:none;display:flex;align-items:center;gap:5px;opacity:0.45;}
+  .pill:hover{opacity:0.75;transform:translateY(-1px);}
+  .pill.selected{font-weight:700;transform:translateY(-2px);opacity:1;box-shadow:0 4px 16px rgba(0,0,0,0.6);}
   .pill-h{background:#0E1720;color:#A8C4E0;border-color:#A8C4E0;}
   .pill-f{background:#1A0E18;color:#E8B4C8;border-color:#E8B4C8;}
   .pill-ag{background:#0E1E1E;color:#A8D8D8;border-color:#A8D8D8;}
@@ -180,8 +180,8 @@
       <div class="counter-lbl">visites</div>
     </div>
     <div class="counter-impr">
-      <div class="counter-num" id="impr-count">0</div>
-      <div class="counter-lbl">🖨️ impr.</div>
+      <div class="counter-impr-num" id="impr-count">0</div>
+      <div class="counter-impr-lbl">🖨️ impr.</div>
     </div>
   </div>
 </header>
@@ -194,6 +194,7 @@
     <button class="tab-btn" onclick="showTab('rapport')" id="tab-rapport">📊 Rapport</button>
   </div>
 
+  <!-- ── ONGLET SAISIE ── -->
   <div class="tab-content active" id="content-saisie">
 
     <div class="correction-banner" id="correction-banner">
@@ -294,6 +295,7 @@
     </div>
   </div>
 
+  <!-- ── ONGLET VISITES DU JOUR ── -->
   <div class="tab-content" id="content-visites">
     <div class="visits-card">
       <div class="visits-header">
@@ -309,6 +311,7 @@
     </div>
   </div>
 
+  <!-- ── ONGLET RAPPORT ── -->
   <div class="tab-content" id="content-rapport">
     <div style="max-width:900px;margin:0 auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -346,10 +349,20 @@
 
 </main>
 
+<iframe id="hidden-frame" name="hidden-frame" style="display:none;width:0;height:0;border:none;"></iframe>
+<form id="hidden-form" method="GET" target="hidden-frame" style="display:none">
+  <input type="hidden" name="heure" id="f-heure">
+  <input type="hidden" name="type" id="f-type">
+  <input type="hidden" name="statut" id="f-statut">
+  <input type="hidden" name="activite" id="f-activite">
+  <input type="hidden" name="atelier" id="f-atelier">
+  <input type="hidden" name="impr" id="f-impr">
+  <input type="hidden" name="nb_impr" id="f-nb_impr">
+  <input type="hidden" name="remarques" id="f-remarques">
+</form>
 <div class="toast" id="toast"></div>
 
 <script>
-// ⚠️ METS TON LIEN GOOGLE APPS SCRIPT ICI !
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2k5FNBbmLXp84-3WrXrPg5xyXTupmrn7QJ--8NyPR4UMzw978VDSqK9LN8iNa8odnPA/exec';
 
 const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
@@ -357,7 +370,7 @@ const MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','
 const now=new Date();
 document.getElementById('date-display').textContent=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
 
-function today(){return now.getFullYear()+'-'+(now.getMonth()+1)+'-'+now.getDate();}
+function today(){return now.getFullYear()+'-'+now.getMonth()+'-'+now.getDate();}
 let visitCount=parseInt(localStorage.getItem('visitCount_'+today())||'0');
 let lastEntry=JSON.parse(localStorage.getItem('lastEntry')||'null');
 let lastTime=parseInt(localStorage.getItem('lastTime')||'0');
@@ -416,39 +429,19 @@ function submitForm(){
     activite:getSelected('pills-activite'),
     atelier:document.getElementById('sel-atelier').value,
     impr:getSelected('pills-impr'),
-    nb_impr:document.getElementById('nb-impr').value||'0',
+    nb_impr:document.getElementById('nb-impr').value||'',
     remarques:document.getElementById('txt-remarques').value,
   };
-
-  const ex=document.getElementById('jsonp-submit'); if(ex) ex.remove();
-  window._cbSubmit=function(response){
-    if(response.status==='ok'){
-      visitCount++;
-      localStorage.setItem('visitCount_'+today(),visitCount);
-      document.getElementById('visit-count').textContent=visitCount;
-      localStorage.setItem('lastEntry',JSON.stringify(entry));
-      localStorage.setItem('lastTime',Date.now().toString());
-      lastEntry=entry;lastTime=Date.now();
-      showToast('✓ Visite enregistrée dans Google Sheets !','success');
-      resetForm();showCorrectionBanner();
-      renderTable();
-    } else {
-      showToast('⚠️ Problème serveur à la sauvegarde.','error');
-    }
-  };
-
-  const s=document.createElement('script'); s.id='jsonp-submit';
-  s.src=SCRIPT_URL+'?heure='+encodeURIComponent(entry.heure)+
-                   '&type='+encodeURIComponent(entry.type)+
-                   '&statut='+encodeURIComponent(entry.statut)+
-                   '&activite='+encodeURIComponent(entry.activite)+
-                   '&atelier='+encodeURIComponent(entry.atelier)+
-                   '&impr='+encodeURIComponent(entry.impr)+
-                   '&nb_impr='+encodeURIComponent(entry.nb_impr)+
-                   '&remarques='+encodeURIComponent(entry.remarques)+
-                   '&callback=_cbSubmit';
-  s.onerror=()=>{showToast('❌ Impossible de joindre Google Sheets !','error');};
-  document.body.appendChild(s);
+  var params='heure='+encodeURIComponent(entry.heure)+'&type='+encodeURIComponent(entry.type)+'&statut='+encodeURIComponent(entry.statut)+'&activite='+encodeURIComponent(entry.activite)+'&atelier='+encodeURIComponent(entry.atelier)+'&impr='+encodeURIComponent(entry.impr)+'&nb_impr='+encodeURIComponent(entry.nb_impr)+'&remarques='+encodeURIComponent(entry.remarques);
+  var img=new Image();img.src=SCRIPT_URL+'?'+params;
+  visitCount++;
+  localStorage.setItem('visitCount_'+today(),visitCount);
+  document.getElementById('visit-count').textContent=visitCount;
+  localStorage.setItem('lastEntry',JSON.stringify(entry));
+  localStorage.setItem('lastTime',Date.now().toString());
+  lastEntry=entry;lastTime=Date.now();
+  showToast('✓ Visite enregistrée !','success');
+  resetForm();showCorrectionBanner();
 }
 
 function resetForm(){
@@ -517,6 +510,7 @@ function showTab(tab){
   if(tab==='visites') renderTable();
 }
 
+// ── Visites du jour ───────────────────────────────────────────────────────
 let currentRows=[];
 
 function renderTable(){
@@ -545,14 +539,10 @@ function buildTable(rows){
   let totalImpr=0;
   rows.forEach((e,i)=>{
     const icon=ICONS[e.activite]||'';
-    const statBadge=e.statut==='Abonné'?'<span class="badge badge-abo">✓ Abonné</span>':'<span class="badge badge-nab">Non ab.</span>';
-    
-    // ✅ CORRECTION 1 ICI : On teste si e.impr contient "Oui"
-    const isImpr = e.impr && e.impr.toString().startsWith('Oui');
-    const imprBadge=isImpr?'<span class="badge badge-yes">🖨️ '+(e.nb_impr||1)+'</span>':'<span class="badge badge-no">Non</span>';
-    if(isImpr) totalImpr+=parseInt(e.nb_impr)||1;
-
-    html+='<tr><td style="color:#666;font-family:monospace">'+(i+1)+'</td><td style="font-weight:500;color:#EDE8E3">'+e.heure+'</td><td>'+e.type+'</td><td>'+statBadge+'</td><td>'+icon+' '+e.activite+(e.atelier?'<br><span style="font-size:10px;color:#666">'+e.atelier+'</span>':'')+'</td><td>'+imprBadge+'</td><td><button class="btn-delete" onclick="deleteRow('+i+')">✕</button></td></tr>';
+    const statBadge=e.statut==='Abonné'?'<span class="badge badge-abo">✓ Abonné</span>":'<span class="badge badge-nab">Non ab.</span>';
+    const imprBadge=e.impr==='Oui'?'<span class="badge badge-yes">🖨️ '+(e.nb_impr||1)+'</span>":'<span class="badge badge-no">Non</span>';
+    if(e.impr==='Oui') totalImpr+=parseInt(e.nb_impr)||1;
+    html+='<tr><td style="color:#666;font-family:monospace">'+( i+1)+'</td><td style="font-weight:500;color:#EDE8E3">'+e.heure+'</td><td>'+e.type+'</td><td>'+statBadge+'</td><td>'+icon+' '+e.activite+(e.atelier?'<br><span style="font-size:10px;color:#666">'+e.atelier+'</span>':'')+'</td><td>'+imprBadge+'</td><td><button class="btn-delete" onclick="deleteRow('+i+')">✕</button></td></tr>';
   });
   html+='</tbody></table></div>';
   body.innerHTML=html;
@@ -567,6 +557,7 @@ function deleteRow(index){
   showToast('🗑️ Visite supprimée','error');
 }
 
+// ── Rapport ───────────────────────────────────────────────────────────────
 (function(){
   const n=new Date();
   const mon=new Date(n);mon.setDate(n.getDate()-n.getDay()+1);
@@ -620,13 +611,7 @@ function buildRapport(rows,debut,fin){
     if(isApm(r.heure))byDate[k].apm++;
     byDate[k].total++;
     if(byDate[k].types[r.type]!==undefined)byDate[k].types[r.type]++;
-    
-    // ✅ CORRECTION 2 ICI : On teste si l'impression commence par "Oui"
-    if(r.impr && r.impr.toString().startsWith('Oui')){
-      const nb=parseInt(r.nb_impr)||1;
-      byDate[k].nbImpr+=nb;
-      byDate[k].cout+=nb*0.20;
-    }
+    if(r.impr==='Oui'){const nb=parseInt(r.nb_impr)||1;byDate[k].nbImpr+=nb;byDate[k].cout+=nb*0.20;}
   });
   const dates=Object.keys(byDate).sort((a,b)=>{
     const [da,ma,ya]=a.split('/').map(Number);
@@ -638,8 +623,8 @@ function buildRapport(rows,debut,fin){
     ['r-t1','r-t2','r-t3'].forEach(id=>document.getElementById(id).innerHTML=msg);
     return;
   }
-  let totTotal=0,totMatin=0,totApm=0,totImpr=0,totCout=0;
-  dates.forEach(d=>{totTotal+=byDate[d].total;totMatin+=byDate[d].matin;totApm+=byDate[d].apm;totImpr+=byDate[d].nbImpr;totCout+=byDate[d].cout;});
+  let totTotal=0,totMatin=0,totApm=0,totImpr=0,totCout=0,totImprPersonnes=0;
+  dates.forEach(d=>{totTotal+=byDate[d].total;totMatin+=byDate[d].matin;totApm+=byDate[d].apm;totImpr+=byDate[d].nbImpr;totCout+=byDate[d].cout;totImprPersonnes+=(d.nbPersonnesImpr||0);});
   document.getElementById('r-k-total').textContent=totTotal;
   document.getElementById('r-k-matin').textContent=totMatin;
   document.getElementById('r-k-apm').textContent=totApm;
@@ -651,7 +636,6 @@ function buildRapport(rows,debut,fin){
   document.getElementById('r-t1-sub').textContent=rows.length+' visites';
   document.getElementById('r-t2-sub').textContent=rows.length+' visites';
   document.getElementById('r-t3-sub').textContent=totImpr+' feuilles — '+totCout.toFixed(2)+' €';
-  
   // Tableau 1
   let t1='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th><th>🌅 Matin<br><span style="font-weight:400;font-size:9px">9h–12h</span></th><th>🌇 Après-midi<br><span style="font-weight:400;font-size:9px">14h–17h</span></th><th>Total</th></tr></thead><tbody>';
   dates.forEach(dk=>{
@@ -662,7 +646,6 @@ function buildRapport(rows,debut,fin){
   });
   t1+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td><td><span class="bm bm-teal">'+totMatin+'</span></td><td><span class="bm bm-amber">'+totApm+'</span></td><td><span class="bm bm-tot">'+totTotal+'</span></td></tr></tfoot></table></div>';
   document.getElementById('r-t1').innerHTML=t1;
-  
   // Tableau 2
   const TYPES=[{key:'Homme',label:'👨 Homme',cls:'ct-h'},{key:'Femme',label:'👩 Femme',cls:'ct-f'},{key:'Adolescent Garçon',label:'🧑 Ado G.',cls:'ct-ag'},{key:'Adolescente Fille',label:'👧 Ado F.',cls:'ct-af'},{key:'Enfant Garçon',label:'👦 Enf. G.',cls:'ct-eg'},{key:'Enfant Fille',label:'🧒 Enf. F.',cls:'ct-ef'}];
   const totTypes={};TYPES.forEach(t=>totTypes[t.key]=0);
@@ -681,14 +664,13 @@ function buildRapport(rows,debut,fin){
   TYPES.forEach(t=>{t2+='<td class="'+t.cls+'" style="font-weight:700">'+totTypes[t.key]+'</td>';});
   t2+='<td><span class="bm bm-tot">'+totTotal+'</span></td></tr></tfoot></table></div>';
   document.getElementById('r-t2').innerHTML=t2;
-  
   // Tableau 3
   let t3='<div style="overflow-x:auto"><table class="rtbl"><thead><tr><th class="thl" style="width:90px">Date</th><th class="thl" style="width:80px">Jour</th><th>🖨️ Feuilles</th><th>💰 Coût</th><th>Visites</th><th>% impr.</th></tr></thead><tbody>';
   dates.forEach(dk=>{
     const d=byDate[dk];
     const [day,month,year]=dk.split('/').map(Number);
     const jour=JOURS2[new Date(year,month-1,day).getDay()];
-    const pct=d.total>0?Math.round(d.nbImpr/d.total*100):0;
+    const pct=d.total>0?Math.round((d.nbPersonnesImpr||0)/d.total*100):0;
     t3+='<tr><td class="td-date">'+dk+'</td><td class="td-day">'+jour+'</td><td><span class="bm bm-impr">'+d.nbImpr+'</span></td><td><span class="bm bm-cout">'+d.cout.toFixed(2)+' €</span></td><td><span class="bm bm-tot">'+d.total+'</span></td><td style="color:'+(pct>0?'#F0C8A0':'var(--muted)')+';font-weight:'+(pct>0?'600':'400')+'">'+pct+' %</td></tr>';
   });
   t3+='</tbody><tfoot><tr><td class="td-date" colspan="2">TOTAL</td><td><span class="bm bm-impr">'+totImpr+'</span></td><td><span class="bm bm-cout">'+totCout.toFixed(2)+' €</span></td><td><span class="bm bm-tot">'+totTotal+'</span></td><td style="color:#F0C8A0;font-weight:700">'+(totTotal>0?Math.round(totImpr/totTotal*100):0)+' %</td></tr></tfoot></table></div>';
